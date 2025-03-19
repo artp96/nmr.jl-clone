@@ -18,7 +18,7 @@ function parse_or(::Type{T}, s, default::T) where T
     v === nothing ? default : v
 end
 
-filters = [ ( Set(["SW", "O1", "SFO1", "SF", "BF1"]),
+const filters = [ ( Set(["SW", "O1", "SFO1", "SF", "BF1"]),
               s -> parse(Float64, s) ),
             ( Set(["TD", "NS", "DS", "SI"]),
               s -> parse(Int, s) ),
@@ -46,14 +46,14 @@ function read_intrng(file)
     lines = try
         readlines(file)
     catch
-        return []
+        return (missing, missing)
     end
     if length(lines) > 2 && strip(lines[1])[1] == 'A'
         [tuple(map(s -> parse(Float64, s), split(line)[1:2])...) for line in lines[3:end]]
     elseif length(lines) > 1 && strip(lines[1])[1] == 'P'
         [tuple(map(s -> parse(Float64, s), split(line))...) for line in lines[2:end]]
     else
-        []
+        return (missing, missing)
     end
 end
 
@@ -63,7 +63,7 @@ function parse_param(param, val)
             return fun(val)
         end
     end
-    return strip(val)
+    return strip(string(val))
 end
 
 function ProcessedSpectrum(path :: AbstractString, procno :: Int)
@@ -95,7 +95,9 @@ Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: 
         expno = parse(Int,expno) 
     end
 
-    procs = Dict()
+    # Needs to be instantiated correctly
+    procs = Dict{Int, ProcessedSpectrum{Float64, Vector{Float64}}}()
+
     for procno in procnos
         proc_path = joinpath(path, "pdata", string(procno))
         procs[procno] = ProcessedSpectrum(proc_path, procno)
@@ -104,6 +106,11 @@ Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: 
 end
 
 Spectrum(path :: AbstractString, procno :: Int) = Spectrum(path, [procno], procno)
-
+function Spectrum(path :: AbstractString)
+  println.(parse.(Int, readdir(path)))
+    println("Choose a procno")
+    procno = parse.(Int, readline())
+    #Spectrum(path,  procno)
+end
 Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Spectrum(path, procnos, minimum(procnos))
 

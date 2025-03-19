@@ -12,7 +12,7 @@ end
 function dump(path, s::Spectrum)
     if !isdir(path)
         mkdir(path)
-    end
+end
 
     # Save each child proc
     for (n,p) in s.procs

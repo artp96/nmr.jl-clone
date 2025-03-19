@@ -4,9 +4,9 @@
 # the variables from the popt.protocol, and outputs a 
 # heatmap in integral or peak intensity mode.
 #
-using GLMakie, LaTeXStrings
+using Makie, GLMakie, LaTeXStrings
 
-function lineplot_Complex(s :: S; procno = false, palette = nothing, kwargs...) where S <: Main.NMR.Spectrum
+function lineplot_Complex(s :: S; procno = false, palette = nothing, kwargs...)where S <: Main.NMR.PoptSpectrum{T} where T <: AbstractFloat
     # get last procno by default
     !procno ? procno = s.default_proc : procno
     fig = Figure()
@@ -15,3 +15,24 @@ function lineplot_Complex(s :: S; procno = false, palette = nothing, kwargs...) 
     lines!(ax, s.procs[procno].im_ft, label = L"\Im")
     return fig
 end
+
+
+function splatted_heatmaps(a :: A; vars = missing, colormap = :plasma) where {T <: AbstractFloat, A <: AbstractArray{T}}
+    d = size(a); I = Int64
+    
+    color_range = extrema(a)
+    a = eachslice(a, dims = length(d))
+    n = length(a)
+    isinteger(sqrt(n)) ? (w, h) = (sqrt(I,n), sqrt(I,n)) : (w, h) = (ceil(I,sqrt(n)), floor(I,sqrt(n)))
+    fig = Figure(; size = (1200,800))
+    for w in 1:w, h in 1:h
+        idx = w + w * (h-1)
+        ax = Axis(fig[w, h], xlabel = "X (units)", ylabel = "Y (units)", title = "$idx (units)")
+        heatmap!(ax, a[w + h - 1], colormap=colormap, colorrange = color_range)
+    end
+    Colorbar(fig[:, h+1], colormap = colormap, colorrange = color_range, label = "Intensity a.u.")
+    resize_to_layout!(fig)
+    return fig
+end
+
+export heatmap_Popt, splatted_heatmaps
