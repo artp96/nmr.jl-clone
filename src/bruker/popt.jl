@@ -43,9 +43,9 @@ end
 """
     Function to parse the popt protocol into a set of headers and columns
 """
-function parse_PoptProtocol(file; run = 1, debug1 = true)
+function parse_PoptProtocol(file; run = 1)
     contents = read(file, String)
-    debug1 && println(contents)
+    debug && println(contents)
     # Extract headers 
     headerline = eachmatch(r"MOD=\s*\S+\n\n(Experiment[A-Za-z\d\s]+ Integral)\n\s*\d"s,
                            contents)
@@ -107,6 +107,21 @@ function get_ArrayPoptDims(df :: T) where T <: AbstractDataFrame
     h = names(df)
     filter!(x -> !(x ∈ boring_columns), h)
 
+    # Want the number of independent variables, excluding N, min, max, ∫dx cols.
+    n = length(h)
+    vars = df[:, 2:n+1]
+    # Find the unique combinations of variables
+    xyz = unique.(eachcol(vars))
+    # must be a Tuple
+    dims = length.(xyz)
+    reverse!(dims)
+    debug && println(dims)
+    dims = tuple.(dims...)
+
+    for (i,h) in enumerate(h)
+        indices = Dict{String, Vector}(h => xyz[i])
+    end
+    return dims, vars
 end
 
 """
@@ -115,18 +130,9 @@ end
     Should work to take f(df, df.int), or f(df, vec) for some custom vector -
     the purpose of this function is to order indices.
 """
-function restructure_array(popt_Table::DataFrame, vec)
-    h = names(popt_Table)
-    # Want the number of independent variables, excluding N, min, max, ∫dx cols.
-    n = length(h) - 4
-    vars = df[:, 2:n+1]
-    # Find the unique combinations of variables
-    xyz = unique.(eachcol(vars))
-    # must be a Tuple
-    dims = length.(xyz)
-    reverse!(dims)
-    println(dims)
-    dims = tuple.(dims...)
+function restructure_array(df::DataFrame, vec)
+    #get the new array structure
+    dims, vars = get_ArrayPoptDims(df)
     # return the reshaped array
     return reshape(vec, dims)
 end
