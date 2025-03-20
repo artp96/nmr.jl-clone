@@ -12,7 +12,6 @@ using DataFrames
 """
 Popt_Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int) = begin
     # below, changed joinpath to omit "fid", can't find this anywhere ?
-    #fid = float(read_bruker_binary(joinpath(path, "fid")))
     fid = float(read_bruker_binary(path))
     acqu = read_params(joinpath(path, "acqu"))
     serfile = fetch_serfile(path)
@@ -41,11 +40,11 @@ function fetch_serfile(file)
 end
 
 """
-    Function to parse the popt protocol into a set of headers and columns
+    Function to parse the popt protocol into a set of headers and only interesting columns
 """
-function parse_PoptProtocol(file; run = 1, debug1 = true)
+function parse_PoptProtocol(file; run = 1)
     contents = read(file, String)
-    debug1 && println(contents)
+    debug && println(contents)
     # Extract headers 
     headerline = eachmatch(r"MOD=\s*\S+\n\n(Experiment[A-Za-z\d\s]+ Integral)\n\s*\d"s,
                            contents)
