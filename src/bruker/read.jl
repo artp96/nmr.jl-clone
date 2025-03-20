@@ -110,7 +110,7 @@ function Spectrum(path :: AbstractString)
   println.(parse.(Int, readdir(path)))
     println("Choose a procno")
     procno = parse.(Int, readline())
-    #Spectrum(path,  procno)
+    Spectrum(path,  procno)
 end
 Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Spectrum(path, procnos, minimum(procnos))
 
