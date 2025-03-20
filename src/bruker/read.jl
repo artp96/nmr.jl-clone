@@ -33,7 +33,7 @@ const filters = [ ( Set(["SW", "O1", "SFO1", "SF", "BF1"]),
 function read_params(file)
     contents = read(file, String)
     matches = eachmatch(r"##\$?(.*?)=\s?([^#]+)"s, contents)
-    res = Dict(m.captures[1] => parse_param(m.captures[1], m.captures[2]) for m in matches)
+    res = Dict(string(m.captures[1]) => parse_param(m.captures[1], m.captures[2]) for m in matches)
 
     # a few little tweaks
     if "O1" in keys(res) && !("O1P" in keys(res))
@@ -46,14 +46,14 @@ function read_intrng(file)
     lines = try
         readlines(file)
     catch
-        return (missing, missing)
+        return missing
     end
     if length(lines) > 2 && strip(lines[1])[1] == 'A'
         [tuple(map(s -> parse(Float64, s), split(line)[1:2])...) for line in lines[3:end]]
     elseif length(lines) > 1 && strip(lines[1])[1] == 'P'
         [tuple(map(s -> parse(Float64, s), split(line))...) for line in lines[2:end]]
     else
-        return (missing, missing)
+        return missing
     end
 end
 
@@ -72,7 +72,7 @@ function ProcessedSpectrum(path :: AbstractString, procno :: Int)
     params = read_params(joinpath(path, "proc"))
     title = read(joinpath(path, "title"), String)
     intrng = read_intrng(joinpath(path, "intrng"))
-    ProcessedSpectrum(re_ft, im_ft, params, intrng, procno, title)
+    return NMR.ProcessedSpectrum(re_ft, im_ft, params, intrng, procno, title)
 end
 
 ProcessedSpectrum(path::AbstractString) = ProcessedSpectrum(path, parse(Int, basename(path)))
@@ -114,3 +114,4 @@ function Spectrum(path :: AbstractString)
 end
 Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Spectrum(path, procnos, minimum(procnos))
 
+export read_bruker_binary

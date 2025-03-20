@@ -1,42 +1,79 @@
-# A function to convert a popt array to an n-dimensional spectrum.
-# Spectrum(path :: AbstractString) = begin
-#     procnos = [parse(Int,n) for n in readdir(joinpath(path, "pdata"))]
-#     popt_detect = any(diff(procnos) > 1)
-#     popt_detect ? return Popt_Spectrum(path, procnos) : return Spectrum(path, procnos)
-# end
 using DataFrames 
 
-""" Popt_Spectrum()
-    Struct to containing a multidimensional spectrum derived from a POPT 
+#! LAZY DEVELOPMENT DO NOT LEAVE THIS IN
+include("read.jl")
+
+PoptSpectrum(path :: AbstractString, procno :: Int; kwargs...) = Popt_Spectrum(path, [procno], procno; kwargs...)
+"""
+    First outer constructor for simple user interface mode."""
+function PoptSpectrum(path :: AbstractString; UI_enable = true)
+    procnos = parse.(Int, readdir(path * "/pdata"))
+    if UI_enable
+        println("Choose a procno as the target popt array, return for auto.")
+        println.(procnos)
+        println("---")
+        procno = readline()
+    end
+    if !UI_enable || isempty(procno)
+        procno = maximum(procnos)
+    end
+    procno isa String ? procno = parse(Int, procno) : procno = procno
+    PoptSpectrum(path, procnos, procno; UI_enable = UI_enable)
+end
+
+"""
+    
+"""
+PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Popt_Spectrum(path, procnos, maximum(procnos))
+
+""" 
+    PoptSpectrum()
+    Final outer constructor to Struct to containing a multidimensional spectrum derived from a POPT 
     array.
 """
-Popt_Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int) = begin
+function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, procno :: Int; poptno = "", UI_enable = true) 
     # below, changed joinpath to omit "fid", can't find this anywhere ?
     fid = float(read_bruker_binary(path))
     acqu = read_params(joinpath(path, "acqu"))
-    serfile = fetch_serfile(path)
-    protocol = read_PoptProtocol(joinpath(path, "popt.protocol"))
+    protocol = read_PoptProtocol(joinpath(path, "popt.protocol" * poptno))
+    ser = fetch_serfile(path, poptno, contents; UI_enable = UI_enable)
     name = basename(dirname(path))
     expno = parse(Int, basename(path))  
-    procs = Dict()
-    popt_protocol = read_PoptProtocol(joinpath(path, "popt.protocol"))
-    for procno in procnos
-        proc_path = joinpath(path, "pdata", string(procno))
-        procs[procno] = ProcessedSpectrum(proc_path, procno)
-    end
-    Spectrum(fid, acqu, procs, default_proc, name, expno)
+    # Popt spectra arrays need only 1 procno and 1 serfile
+    proc_path = joinpath(path, "pdata", string(procno))
+    proc = ProcessedSpectrum(proc_path, procno)
+    v = []
+    return (fid, acqu, procno, expno, path, protocol, ser, proc, v)
+    return NMR.PoptSpectrum(fid, acqu, procno, expno, path, protocol, ser, proc, v)
 end
 
-function fetch_serfile(file)
-    contents = read(file, String)
-    try  
-    # This regex captures the end of this line to the new line.
-      serfile_addr = match(r"Target directory for serfile: (.*?)\n", contents).captures[1]
-    catch
-      # can handle with !ismissing later
-      serfile_addr = missing
-    end     
-    return serfile_addr
+# function to get the ser matched to the given popt.protocol.n
+function fetch_serfile(path, poptno, contents; UI_enable = false)
+    path = splitpath(path)
+    path = joinpath(path[1:end-1])    
+    #prompt for the correct expno
+    if isempty(poptno) && UI_enable
+        println("Choose an expno as the popt serfile container.")
+        println.(parse.(Int, readdir(path)))
+        println("---")
+        expno = readline()
+        ser_addr = joinpath(path, expno, "ser")
+        ser = read_bruker_binary(ser_addr)
+    elseif !isempty(poptno)
+        expno = poptno
+        ser_addr = joinpath(path, expno, "ser")
+        ser = read_bruker_binary(ser_addr)
+    elseif isempty(poptno) & !UI_enable
+        m = match(r"serfile: (.*)\s", contents)
+        try
+            expno = splitpath(m[1])[end]
+            ser_addr = joinpath(path, expno, "ser")
+        catch err
+            @warn "No expno found for serfile."
+            ser = [] # not an unusual case, handle gracefully
+        end
+    end
+    return ser
 end
 
 """
@@ -85,7 +122,7 @@ function read_PoptProtocol(file)
 end
 
 """
-    Form a dynamic regex to split the columns of data
+    Form a dynamic regex to split the columns of data - redundant?
 """
 function build_data_regex(headers :: T) where T <: Base.RegexMatchIterator{String}
     #Can't natively get the length of the Iterator type
@@ -110,21 +147,19 @@ function get_ArrayPoptDims(df :: T) where T <: AbstractDataFrame
     n = length(h)
     vars = df[:, 2:n+1]
     # Find the unique combinations of variables
-    xyz = unique.(eachcol(vars))
+    vals = unique.(eachcol(vars))
     # must be a Tuple
-    dims = length.(xyz)
+    dims = length.(vals)
     reverse!(dims)
     debug && println(dims)
     dims = tuple.(dims...)
 
-    for (i,h) in enumerate(h)
-        indices = Dict{String, Vector}(h => xyz[i])
-    end
-    return dims, vars
+    indices = Dict{String, Vector}(zip(h, vals))
+    return dims, indices
 end
 
 """
-    A function ake an array of integrals or intensities from experiments
+    A function to take an array of integrals or intensities from experiments
     and arrange them according to the popt protocol used.
     Should work to take f(df, df.int), or f(df, vec) for some custom vector -
     the purpose of this function is to order indices.
@@ -138,4 +173,4 @@ end
 
 
 
-export read_PoptProtocol, parse_PoptProtocol, restructure_array
+export read_PoptProtocol, parse_PoptProtocol, restructure_array, PoptSpectrum

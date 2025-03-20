@@ -1,7 +1,7 @@
 # Some utilities
 const S = String
 "Integration range in the frequency domain, values given in ppm."
-const Intrng{T} = Tuple{T, T} where T <: Union{AbstractFloat, Missing}
+const Intrng{T} = Tuple{T, T} where T <: AbstractFloat
 abstract type AbstractSpectrum end
 
 """
@@ -13,15 +13,34 @@ Processed (frequency domain) NMR spectrum. Parameters follow the Bruker conventi
 - **title**: Spectrum title
 """
 
-mutable struct ProcessedSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, S <: AbstractString} <: AbstractSpectrum
+mutable struct ProcessedSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, S <: String} <: AbstractSpectrum
     re_ft :: V
     im_ft :: V
     params :: Dict{S, Any}
-    intrng :: Intrng
+    intrng :: Union{Intrng{T},Missing}
     procno :: Int
-    title :: String
+    title :: S
+    function ProcessedSpectrum{T, V, S}(re :: V, im :: V, par :: Dict{S, Any}, intrng :: Union{Intrng{T}, Missing}, pn :: Int, t :: S) where {
+        T <: AbstractFloat, V <: AbstractVector{T}, S <: String
+        }
+        # Validate that `intrng` is a Tuple of two elements
+        
+        ismissing(intrng) && return new{T, V, S}(re, im, par, missing, pn, t) 
+
+        if !(length(intrng) == 2)
+            throw(ArgumentError("`intrng` must be a tuple of length 2"))
+        end
+        return new{T, typeof(re), S}(re, im, par, intrng, pn, t)
+    end
 end
 
+ """
+    Outer Constructor Definition"""
+function ProcessedSpectrum(re::V, im::V, par::Dict{S, Any}, intrng::Union{Intrng{T}, Missing}, pn::Int, t::S) where {
+    T <: AbstractFloat, V <: AbstractVector{T}, S <: String
+}
+    ProcessedSpectrum{T, V, S}(re, im, par, intrng, pn, t)
+end
 
 Base.getindex(p::ProcessedSpectrum, n::Int) = p.intrng[n]
 Base.getindex(p::ProcessedSpectrum, param::AbstractString) = p.params[param]
@@ -63,33 +82,6 @@ mutable struct Spectrum{T <: AbstractFloat, V <: AbstractVector{T}, P <: Process
     end
 end
 
-mutable struct PoptSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, A <: AbstractArray{T}} <: AbstractSpectrum
-    fid :: V # should probably shadow the ser if it exists
-    acqu :: Dict{S, Any}
-    procno :: Int # for popt, usually 899, 898, etc.
-    name :: S
-    fpath :: S # Should point to the correct protocol with numerical suffix
-    protocol :: S
-    ser :: A  # raw 2D spectrum, may not always exist
-    proc :: A# Bruker processed POPT output
-    vars :: Dict{S, T}
-    """
-        PoptSpectrum()
-        Inner constructor to restructure the popt array automatically.
-        Outer constructors should be used to get all the variables from a popt file.
-    """
-    function PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, n :: S, fp :: S, prot :: S, ser :: A, proc :: A, v :: Dict{S, T}) where {
-        T <: AbstractFloat, V <: AbstractVector{T}, A <: AbstractArray{T}, S <: String} <: AbstractSpectrum
-        
-        
-        dims, vars = get_ArrayPoptDims(prot)
-        proc = reshape(proc, dims)
-        !isempty(ser) && ser = reshape(ser, dims)
-        return new(f, a, p, n, fp, prot, ser, proc, v)
-    end
-
-end
-
 Base.getindex(s::Spectrum, i::Int) = s.procs[i]
 Base.getindex(s::Spectrum, ::Colon) = s.procs[s.default_proc].re_ft
 Base.getindex(s::Spectrum, a::AbstractArray) = s.procs[s.default_proc].re_ft[a]
@@ -108,11 +100,40 @@ Base.setindex!(s::Spectrum, d::AbstractArray, ::Colon) = (s[s.default_proc].re_f
 Base.setindex!(s::Spectrum, d::AbstractArray, r::UnitRange) = (s[s.default_proc].re_ft[r] .= d)
 Base.setindex!(s::Spectrum, d, rng::Tuple{Float64, Float64}) = (s[s.default_proc].re_ft[ppmtoindex(s,rng)]=d)
 
-Spectrum(fid :: V, acqu :: Dict{S, Any}, proc :: P) where {
-    T <: AbstractFloat,
-    V <: AbstractVector{T},
-    S <: AbstractString,
-    P <: ProcessedSpectrum{T, V}
-    } = Spectrum(fid, acqu, Dict{Int, ProcessedSpectrum{T, V}}(1=>proc), 1, "", "")
+function Spectrum(fid :: V, acqu :: Dict{S, Any}, proc :: P) where {
+    T <: AbstractFloat, V <: AbstractVector{T}, S <: AbstractString, P <: ProcessedSpectrum{T, V}
+    }
+    return Spectrum(fid, acqu, Dict{Int, ProcessedSpectrum{T, V}}(1=>proc), 1, "", "")
+end
+
+mutable struct PoptSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, A <: AbstractArray{T}} <: AbstractSpectrum
+    fid :: V # should probably shadow the ser if it exists
+    acqu :: Dict{S, Any}
+    procno :: Int # for popt, usually 899, 898, etc.
+    name :: S
+    fpath :: S # Should point to the correct protocol with numerical suffix
+    protocol :: S
+    ser :: A # raw 2D spectrum, may not always exist
+    proc :: ProcessedSpectrum{T, V, S} # Bruker processed POPT output, as array
+    vars :: Dict{S, V}
+    """
+        PoptSpectrum()
+        Inner constructor to restructure the popt array automatically.
+        Outer constructors should be used to get all the variables from a popt file.
+    """
+    function PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, n :: S, fp :: S, prot :: S, ser :: A, proc :: ProcessedSpectrum{T, V, S}, v :: Dict{S, V}) where {
+        T <: AbstractFloat, V <: AbstractVector{T}, A <: AbstractArray{T}, S <: String} <: AbstractSpectrum
+        dims, vars = get_ArrayPoptDims(prot)
+        # Ensure the array correctly includes each fid as the last dimension;
+        # n.b. ÷() is integer divisor operator, /() returns f64.
+        procdims = tuple(dims..., length(proc) ÷ prod(dims))
+        proc = reshape(proc, procdims)
+        # Handle the case of no serfile.
+        serdims = tuple(dims..., length(ser) ÷ prod(dims))
+        ser = isempty(ser) ? [] : reshape(ser, serdims)
+        return new{T, V, A}(f, a, p, n, fp, prot, ser, proc, v)
+    end
+
+end
 
 export Spectrum
