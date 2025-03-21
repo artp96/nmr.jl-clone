@@ -1,4 +1,3 @@
-import Base: show
 
 function show(io::IO, s::Spectrum)
     println(io, "==== $(s.name) ($(s.expno)) ====")

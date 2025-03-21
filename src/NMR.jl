@@ -1,6 +1,15 @@
 module NMR
 
+using DataFrames 
+using GLMakie
+using LaTeXStrings
+using Interpolations
+using LinearAlgebra: norm, normalize, dot
+using Statistics
+using RecipesBase
 
+
+import Base: show, dump, /, +, *, ?, copy!, in
 # include structs first
 include("spectrum_structs.jl")
 
@@ -12,7 +21,8 @@ include("composition.jl")
 include("decomposition.jl")
 include("integration.jl")
 include("interpolation.jl")
-include("plotting.jl")
+# old Plots.jl functions
+#include("plotting.jl")
 include("show.jl")
 
 # AP's things

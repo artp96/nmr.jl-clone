@@ -1,4 +1,3 @@
-using RecipesBase
 
 function plot_limits(s::NMR.Spectrum, margin = 0.1)
     m, M = (minimum(minimum(d) for d in intrng_data(s)),

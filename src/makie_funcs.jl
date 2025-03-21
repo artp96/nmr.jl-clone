@@ -4,7 +4,6 @@
 # the variables from the popt.protocol, and outputs a 
 # heatmap in integral or peak intensity mode.
 #
-using GLMakie, LaTeXStrings
 
 function lineplot_Complex(s :: S; procno = false, palette = nothing, kwargs...)where S <: Main.NMR.PoptSpectrum{T} where T <: AbstractFloat
     # get last procno by default

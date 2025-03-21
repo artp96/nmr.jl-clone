@@ -1,5 +1,4 @@
 # Continuous interpolation of discrete frequency-domain data
-using Interpolations
 import Interpolations: interpolate
 
 function interpolate(s::Spectrum)

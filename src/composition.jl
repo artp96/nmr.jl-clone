@@ -1,4 +1,3 @@
-import Base: +, -, *, /, copy!
 
 for op in (:*, :/)
     @eval begin

@@ -1,7 +1,4 @@
-import StatsBase
 
-using LinearAlgebra: norm, normalize, dot
-using Statistics
 
 const MINFACT = 0.1
 const HITCORR = 0.9

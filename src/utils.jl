@@ -13,7 +13,6 @@
 # δ = 10^6 * (Ω - SF) / SF = ω / SF
 # 1. Numerical indices indicate different nuclei
 
-import Base: in
 
 limits(s::Spectrum) = limits(s["O1P"], s["SW"], s["SF"], s["BF1"])
 limits(o1p, sw, sf, bf) = begin

@@ -1,7 +1,4 @@
-using DataFrames 
 
-#! LAZY DEVELOPMENT DO NOT LEAVE THIS IN
-include("read.jl")
 
 PoptSpectrum(path :: AbstractString, procno :: Int; kwargs...) = Popt_Spectrum(path, [procno], procno; kwargs...)
 """
@@ -43,7 +40,6 @@ function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, pro
     proc_path = joinpath(path, "pdata", string(procno))
     proc = ProcessedSpectrum(proc_path, procno)
     v = []
-    return (fid, acqu, procno, expno, path, protocol, ser, proc, v)
     return NMR.PoptSpectrum(fid, acqu, procno, expno, path, protocol, ser, proc, v)
 end
 
@@ -170,7 +166,5 @@ function restructure_array(df::DataFrame, vec)
     # return the reshaped array
     return reshape(vec, dims)
 end
-
-
 
 export read_PoptProtocol, parse_PoptProtocol, restructure_array, PoptSpectrum
