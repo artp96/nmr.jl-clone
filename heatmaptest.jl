@@ -1,18 +1,14 @@
 # script to test heatmap script
-using Pkg
-"""
-    pkg needed to resolve dependencies while developing
-"""
-Pkg.develop(path = "../nmr.jl")
-Pkg.instantiate()
-Pkg.resolve()
+using NMR
+#    pkg needed to resolve dependencies while developing
+
+
 
 """
     Some useful globals
 """
 global debug = false
-nmrdata = "~/nmrdata/data" 
-spath  = "/home/art/nmrdata/2024/2025/b300b10/250318"
+spath  = joinpath(homedir(), "nmrdata/data/2025/b300b10/250318")
 
 #!TODO:  NMR.Spectrum does not work without 1i/1r for now 130325. Need to test on a zg spectrum. 
 # Need to test on a zg spectrum
@@ -38,4 +34,4 @@ GLMakie.activate!()
 fig = splatted_heatmaps(mat);
 #
 
-PoptSpectrum(poptpath)
+p = PoptSpectrum(poptpath)

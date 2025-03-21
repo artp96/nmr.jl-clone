@@ -59,7 +59,7 @@ Following Bruker convention:
 - **name**: Experiment name
 - **expno**: Experiment number if, e.g., part of a Bruker dataset
 """
-mutable struct Spectrum{T <: AbstractFloat, V <: AbstractVector{T}, P <: ProcessedSpectrum{T, V}}  <: AbstractSpectrum
+mutable struct Spectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, P <: ProcessedSpectrum{T}}  <: AbstractSpectrum
     fid :: V
     acqu :: Dict{String, Any}
     procs :: Dict{Int, P}
@@ -67,18 +67,21 @@ mutable struct Spectrum{T <: AbstractFloat, V <: AbstractVector{T}, P <: Process
     name :: String
     expno :: Int
         
-        """Inner constructor to handle weakly typed dicts """
+        """Inner constructor to handle weakly typed dicts & split the FID."""
     function Spectrum(f :: V, a :: Dict{S, Any}, p :: Dict{I, P}, d :: I, n :: String, e :: I) where {
         # Type-fu is intensifying #
-        T <: AbstractFloat, V <: AbstractVector{T}, P <: ProcessedSpectrum{T, V}, S <: AbstractString, I <: Int}
-            
-        # for (k, v) in (collect(keys(a)), values(a))
-        #     a_new = Dict{String, Any}(string(k) => v)
-        # end
-        # for (k, v) in (collect(keys(p)), values(p))
-        #     p_new = Dict{Int, ProcessedSpectrum{T, V}}(k => v)
-        # end
-        return new{T, V, P}(f, a, p, d, n, e)
+        T <: AbstractFloat, 
+        V <: AbstractVector{T}, 
+        P <: ProcessedSpectrum{T, V}, 
+        S <: AbstractString, 
+        I <: Int}
+        # process the FID, {ℝ, ℝ} -> ℂ
+        f = split_fid(f)  # Ensure that the transformed FID is of the correct type
+        if !(f isa AbstractVector{<: Complex})
+            throw(ArgumentError("The split FID must be of type AbstractVector{$C}, but got $(typeof(f))"))
+        end
+        W = typeof(f)
+        return new{T, W, P}(f, a, p, d, n, e)
     end
 end
 
@@ -107,33 +110,60 @@ function Spectrum(fid :: V, acqu :: Dict{S, Any}, proc :: P) where {
 end
 
 mutable struct PoptSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, A <: AbstractArray{T}} <: AbstractSpectrum
+
     fid :: V # should probably shadow the ser if it exists
     acqu :: Dict{S, Any}
     procno :: Int # for popt, usually 899, 898, etc.
+    expno :: Int
     name :: S
     fpath :: S # Should point to the correct protocol with numerical suffix
-    protocol :: S
+    protocol :: D where D <: AbstractDataFrame
     ser :: A # raw 2D spectrum, may not always exist
     proc :: ProcessedSpectrum{T, V, S} # Bruker processed POPT output, as array
     vars :: Dict{S, V}
     """
         PoptSpectrum()
-        Inner constructor to restructure the popt array automatically.
+        Inner constructor to restructure the popt array automatically, & store the popt vars.
         Outer constructors should be used to get all the variables from a popt file.
     """
-    function PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, n :: S, fp :: S, prot :: S, ser :: A, proc :: ProcessedSpectrum{T, V, S}, v :: Dict{S, V}) where {
-        T <: AbstractFloat, V <: AbstractVector{T}, A <: AbstractArray{T}, S <: String} <: AbstractSpectrum
+    function PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fp :: S, prot :: DF, ser :: V, proc :: P) where {
+        T <: AbstractFloat, V <: AbstractVector{T}, S <: String, DF <: AbstractDataFrame, P <: ProcessedSpectrum
+        }
         dims, vars = get_ArrayPoptDims(prot)
+        # Validate if the data length matches expected size
+        expected_size = prod(dims)
+        actual_size = length(ser)
+        length(ser) % prod(dims) != 0 && throw(ArgumentError("
+            \n Mismatch between ser length ($actual_size) \n and expected size ($expected_size)."))
+        
         # Ensure the array correctly includes each fid as the last dimension;
         # n.b. ÷() is integer divisor operator, /() returns f64.
-        procdims = tuple(dims..., length(proc) ÷ prod(dims))
-        proc = reshape(proc, procdims)
+        # procdims = tuple(dims..., length(proc) ÷ prod(dims))
+        # proc = reshape(proc, procdims)
         # Handle the case of no serfile.
-        serdims = tuple(dims..., length(ser) ÷ prod(dims))
-        ser = isempty(ser) ? [] : reshape(ser, serdims)
-        return new{T, V, A}(f, a, p, n, fp, prot, ser, proc, v)
+        serdims = tuple(length(ser) ÷ prod(dims), dims...)
+        ser = isempty(ser) ? Float64[] : reshape(ser, serdims)
+        A = typeof(ser)
+        f = split_fid(f)
+        return new{T, V, A}(f, a, p, e, n, fp, prot, ser, proc, vars)
     end
 
 end
 
-export Spectrum
+import Base.im
+""" 
+    Function to produce a synthetic serfile from POPT-processed data - dubious! 
+    No trivial way to find units!
+    May not act correctly if the procno is not a popt procno!
+"""
+synthesize_ser(s :: S) where S <: ProcessedSpectrum = s.re_ft + base.im * s.im_ft
+
+"""
+    Split a fresh FID into it's real and complex parts.
+
+    N-D spectra are still acquired time-domain sequentially, so this should work for all N-D spectra?
+"""
+split_fid(fid :: V) where {R <: Real,  V <: AbstractVector{R}} = fid[1:2:end] .+ 1im * fid[2:2:end]
+split_fid(fid :: V) where {C <: Complex,  V <: AbstractVector{C}} = identity(fid) # do nothing
+
+export Spectrum, PoptSpectrum, ProcessedSpectrum

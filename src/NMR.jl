@@ -7,9 +7,10 @@ using Interpolations
 using LinearAlgebra: norm, normalize, dot
 using Statistics
 using RecipesBase
+using FFTW, AbstractFFTs
 
 
-import Base: show, dump, /, +, *, ?, copy!, in
+import Base: show, dump, /, +, *, -, copy!, in
 # include structs first
 include("spectrum_structs.jl")
 
@@ -29,6 +30,7 @@ include("show.jl")
 include("makie_funcs.jl")
 include("slice_size.jl")
 include("bruker/popt.jl")
+include("eachfibre.jl")
 
 try
     if debug

@@ -5,7 +5,7 @@
 # heatmap in integral or peak intensity mode.
 #
 
-function lineplot_Complex(s :: S; procno = false, palette = nothing, kwargs...)where S <: Main.NMR.PoptSpectrum{T} where T <: AbstractFloat
+function lineplot_Complex(s :: S; procno = false, palette = nothing, kwargs...) where S <: PoptSpectrum
     # get last procno by default
     !procno ? procno = s.default_proc : procno
     fig = Figure()

@@ -29,6 +29,7 @@ PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Popt_Spect
     array.
 """
 function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, procno :: Int; poptno = "", UI_enable = true) 
+    !isempty(poptno) && prepend!(poptno, ".")
     # below, changed joinpath to omit "fid", can't find this anywhere ?
     fid = float(read_bruker_binary(path))
     acqu = read_params(joinpath(path, "acqu"))
@@ -39,8 +40,7 @@ function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, pro
     # Popt spectra arrays need only 1 procno and 1 serfile
     proc_path = joinpath(path, "pdata", string(procno))
     proc = ProcessedSpectrum(proc_path, procno)
-    v = []
-    return NMR.PoptSpectrum(fid, acqu, procno, expno, path, protocol, ser, proc, v)
+    return PoptSpectrum(fid, acqu, procno, expno, name, path, protocol, ser, proc)
 end
 
 # function to get the ser matched to the given popt.protocol.n
@@ -54,7 +54,7 @@ function fetch_serfile(path, poptno, contents; UI_enable = false)
         println("---")
         expno = readline()
         ser_addr = joinpath(path, expno, "ser")
-        ser = read_bruker_binary(ser_addr)
+        ser = read_bruker_binary(ser_addr) |> float
     elseif !isempty(poptno)
         expno = poptno
         ser_addr = joinpath(path, expno, "ser")
@@ -64,9 +64,10 @@ function fetch_serfile(path, poptno, contents; UI_enable = false)
         try
             expno = splitpath(m[1])[end]
             ser_addr = joinpath(path, expno, "ser")
+            ser = read_bruker_binary(ser_addr) |> float
         catch err
             @warn "No expno found for serfile."
-            ser = [] # not an unusual case, handle gracefully
+            ser = Vector{typeof(1.)}([]) # not an unusual case, handle gracefully
         end
     end
     return ser
@@ -167,4 +168,4 @@ function restructure_array(df::DataFrame, vec)
     return reshape(vec, dims)
 end
 
-export read_PoptProtocol, parse_PoptProtocol, restructure_array, PoptSpectrum
+export read_PoptProtocol, parse_PoptProtocol, restructure_array, PoptSpectrum, get_ArrayPoptDims, fetch_serfile
