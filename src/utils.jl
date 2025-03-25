@@ -14,18 +14,18 @@
 # 1. Numerical indices indicate different nuclei
 
 
-limits(s::Spectrum) = limits(s["O1P"], s["SW"], s["SF"], s["BF1"])
+limits(s :: S) where S <: AbstractSpectrum = limits(s["O1P"], s["SW"], s["SF"], s["BF1"])
 limits(o1p, sw, sf, bf) = begin
     shift = 1e6(bf-sf)/bf
     (o1p - sw/2 + shift, o1p + sw/2 + shift)
 end
 
-function in(δ, s::Spectrum)
-    l,h = limits(s)
-    l < δ < h
+function in(δ, s::S) where S <: AbstractSpectrum
+    lo,hi = limits(s)
+    lo < δ < hi
 end
 
-function chemical_shifts(s::Spectrum)
+function chemical_shifts(s::S) where S <: AbstractSpectrum 
     lo,hi = limits(s)
     range(hi; stop=lo, length=length(s[:]))
 end
@@ -52,7 +52,7 @@ end
 
 """
     hztoppm(ω, bf[, sr])
-Convert relative frequency ω in Hz to chemical shift δ in ppm .
+Convert relative frequency ω in Hz to chemical shift δ in ppm.
 bf in MHz and sr in Hz.
 """
 function hztoppm(ω, bf, sr = 0.0)
@@ -71,12 +71,12 @@ sr(sf, bf) = 1e6(sf - bf)
 Return the index in the processed spectrum corresponding to
 chemical shift δ.
 """
-function ppmtoindex(s::Spectrum, δ)
+function ppmtoindex(s :: S, δ) where S <: AbstractSpectrum
     min_δ ,max_δ = limits(s)
     @. Int(cld(s["SI"]*(max_δ - δ), (max_δ - min_δ)))
 end
 
-function ppmtoindex(s::Spectrum, rng::Tuple{Float64,Float64})
+function ppmtoindex(s :: S, rng::Tuple{Float64,Float64}) where S <: AbstractSpectrum
     r1,r2 = rng
     if r1>r2
         ppmtoindex(s,r1):ppmtoindex(s,r2)
@@ -86,10 +86,9 @@ function ppmtoindex(s::Spectrum, rng::Tuple{Float64,Float64})
 end
 
 hztoindex(f, sw, sf, si) = Int(cld(f*si, sw*sf))
-hztoindex(s::Spectrum, f) = hztoindex(f, s["SW"], s["SF"], s["SI"])
+hztoindex(s :: S, f) where S <: AbstractSpectrum = hztoindex(f, s["SW"], s["SF"], s["SI"])
 
-Base.length(s::Spectrum) = length(s[:])
-Base.length(p::ProcessedSpectrum) = length(p[:])
+Base.length(s :: S) where S <: AbstractSpectrum = length(s[:])
 
 function union_range(ss::AbstractArray{Spectrum})
     lims = [limits(s) for s in ss]
@@ -110,6 +109,7 @@ union_shifts(s::Spectrum) = union_shifts([s])
 freq_resolution(s::Spectrum) = s["SW"] / length(s)
 
 title(s::Spectrum) = s[s.default_proc].title
+title(s::PoptSpectrum) = s.proc.title
 
 # Returns a copy of s with all but the given
 # ranges zeroed out. The default proc for s will

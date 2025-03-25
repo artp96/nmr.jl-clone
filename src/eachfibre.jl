@@ -1,41 +1,53 @@
-# Made with GPT-4o
+# Made with GPT-4o's help, I don't get iterators really.
 """
-    FiberIterator(arr::AbstractArray, dim::Int)
+    fibreIterator(arr::AbstractArray, dim::Int)
 
 Creates an iterator that returns each 1D fiber of `arr` along the specified dimension `dim`.
+Like eachcol and eachrow, this is effectively a wrapper for Slices.
 """
-struct FiberIterator{T, N}
-    arr::AbstractArray{T, N}
-    dim::Int
+struct fibreIterator{T, N}
+    arr :: AbstractArray{T, N}
+    dim :: Int
+    max :: Int
+    fibres :: Slices
+    function fibreIterator(arr :: AbstractArray{T, N}, dim::Int) where {T, N} 
+        any(size(arr) .== 0) && Throw(ArgumentError("At least one dimension of $arr is empty! \nsize = $(size(arr))."))
+        max = prod(size(arr)) ÷ size(arr, dim)
+        slice_dims = filter( d -> d != dim, ntuple(identity, ndims(arr)) )
+        fibres = eachslice(arr; dims = slice_dims)
+        new{T, N}(arr, dim, max, fibres)
+    end
 end
 
-# Make FiberIterator an iterator
-function Base.iterate(fib::FiberIterator, state=(1,))
+# Make fibreIterator an iterator
+function Base.iterate(fib::fibreIterator, state=(1,))
     idx = state[1]
-    # Size of the array along the desired dimension
-    size_dim = size(fib.arr, fib.dim)
 
     # If the index is out of range, stop iteration
-    if idx > size_dim
+    if idx > fib.max
         return nothing
     end
 
-    # Create a view for the current fiber along the chosen dimension
-    fiber = view(fib.arr, Base.OneTo(size(fib.arr, 1))..., idx)
-    
+    # views do not work with CUDA, see cuda.subview()
     # Move to the next index
-    return fiber, (idx + 1,)
+    return fib.fibres[idx], (idx + 1,)
 end
 
-function Base.IteratorSize(::Type{<:FiberIterator})
+function Base.IteratorSize(::Type{<:fibreIterator})
     Base.HasLength()
 end
 
-function Base.length(fib::FiberIterator)
-    size(fib.arr, fib.dim)
+function Base.getindex(fib::fibreIterator, i::Int)
+    fib.fibres[i]
 end
+
+function Base.length(fib::fibreIterator)
+    return fib.max
+end
+
+Base.firstindex(fib::fibreIterator) = !isempty(fib) ? 1 : Throw(ArgumentError("fibreIterator is empty!"))
 
 # slighlty simpler interface with default behaviour matching 
 # the structure of popt serfiles
-eachfibre(a; dim = 1) = FiberIterator(a, dim)
+eachfibre(a :: A; dim = 1) where {A <: AbstractArray} = fibreIterator(a, dim)
 export eachfibre

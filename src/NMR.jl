@@ -7,8 +7,16 @@ using Interpolations
 using LinearAlgebra: norm, normalize, dot
 using Statistics
 using RecipesBase
-using FFTW, AbstractFFTs
+using FFTW
+using FastTransforms
 
+#=
+using CUDA
+
+cu = CUDA.happy ? cu : identity
+array = CUDA.happy ? array : identity
+export cu
+=#
 
 import Base: show, dump, /, +, *, -, copy!, in
 # include structs first
@@ -30,6 +38,7 @@ include("show.jl")
 include("makie_funcs.jl")
 include("slice_size.jl")
 include("bruker/popt.jl")
+include("phase_correction.jl")
 include("eachfibre.jl")
 
 try

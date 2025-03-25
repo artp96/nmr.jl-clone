@@ -2,7 +2,8 @@
 
 PoptSpectrum(path :: AbstractString, procno :: Int; kwargs...) = Popt_Spectrum(path, [procno], procno; kwargs...)
 """
-    First outer constructor for simple user interface mode."""
+    PoptSpectrum(path :: AbstractString; UI_enable = true)
+First outer constructor for simple user interface mode."""
 function PoptSpectrum(path :: AbstractString; UI_enable = true)
     procnos = parse.(Int, readdir(path * "/pdata"))
     if UI_enable
@@ -11,7 +12,7 @@ function PoptSpectrum(path :: AbstractString; UI_enable = true)
         println("---")
         procno = readline()
     end
-    if !UI_enable || isempty(procno)
+    if !UI_enable || isempty(procno) 
         procno = maximum(procnos)
     end
     procno isa String ? procno = parse(Int, procno) : procno = procno
@@ -24,9 +25,8 @@ end
 PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Popt_Spectrum(path, procnos, maximum(procnos))
 
 """ 
-    PoptSpectrum()
-    Final outer constructor to Struct to containing a multidimensional spectrum derived from a POPT 
-    array.
+    PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, procno :: Int; poptno = "", UI_enable = true)
+Final outer constructor to Struct to containing a multidimensional spectrum derived from a POPT array.
 """
 function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, procno :: Int; poptno = "", UI_enable = true) 
     !isempty(poptno) && prepend!(poptno, ".")
@@ -44,6 +44,7 @@ function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, pro
 end
 
 # function to get the ser matched to the given popt.protocol.n
+# TODO Not working properly with UI_enable off, need to pass right match target.
 function fetch_serfile(path, poptno, contents; UI_enable = false)
     path = splitpath(path)
     path = joinpath(path[1:end-1])    
