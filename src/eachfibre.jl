@@ -33,21 +33,31 @@ function Base.iterate(fib::fibreIterator, state=(1,))
     return fib.fibres[idx], (idx + 1,)
 end
 
-function Base.IteratorSize(::Type{<:fibreIterator})
-    Base.HasLength()
+function Base.IteratorSize(::Type{<:fibreIterator{T, N}}) where {T, N <: Integer}
+    M = N - 1
+    Base.HasShape{M}()
 end
 
 function Base.getindex(fib::fibreIterator, i::Int)
     fib.fibres[i]
 end
 
+
+Base.size(fib::fibreIterator) = size(fib.fibres)
+
+function Base.getindex(fib::fibreIterator, inds...)
+
+    fib.fibres[i]
+end
 function Base.length(fib::fibreIterator)
     return fib.max
 end
 
 Base.firstindex(fib::fibreIterator) = !isempty(fib) ? 1 : Throw(ArgumentError("fibreIterator is empty!"))
+Base.lastindex(fib::fibreIterator) = !isempty(fib) ? fib.max : Throw(ArgumentError("fibreIterator is empty!"))
 
 # slighlty simpler interface with default behaviour matching 
 # the structure of popt serfiles
 eachfibre(a :: A; dim = 1) where {A <: AbstractArray} = fibreIterator(a, dim)
-export eachfibre
+
+export eachfibre, fibreIterator

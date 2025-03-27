@@ -17,28 +17,37 @@ mutable struct ProcessedSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, S <
     re_ft :: V
     im_ft :: V
     params :: Dict{S, Any}
-    intrng :: Union{Intrng{T},Missing}
+    intrng :: Union{Missing, Vector{Tuple{T, T}}}
     procno :: Int
     title :: S
-    function ProcessedSpectrum{T, V, S}(re :: V, im :: V, par :: Dict{S, Any}, intrng :: Union{Intrng{T}, Missing}, pn :: Int, t :: S) where {
-        T <: AbstractFloat, V <: AbstractVector{T}, S <: String
+    function ProcessedSpectrum{T, V, S}(re :: V, im :: V, par :: Dict{S, Any}, intrng :: I, pn :: Int, t :: S) where {
+        T <: AbstractFloat, V <: AbstractVector{T}, S <: String, I <: Union{Missing, Vector{Tuple{T, T}} }
+
         }
         # Validate that `intrng` is a Tuple of two elements
         
-        ismissing(intrng) && return new{T, V, S}(re, im, par, missing, pn, t) 
-
-        if !(length(intrng) == 2)
-            throw(ArgumentError("`intrng` must be a tuple of length 2"))
+        if ismissing(intrng) 
+            intrng = Vector{Tuple{T, T}}()
         end
-        return new{T, typeof(re), S}(re, im, par, intrng, pn, t)
+        
+        return new{T, V, S}(re, im, par, intrng, pn, t)
     end
 end
 
  """
-    Outer Constructor Definition"""
-function ProcessedSpectrum(re::V, im::V, par::Dict{S, Any}, intrng::Union{Intrng{T}, Missing}, pn::Int, t::S) where {
-    T <: AbstractFloat, V <: AbstractVector{T}, S <: String
+    Outer Constructor Definition
+
+Creates a `ProcessedSpectrum` object, accepting `Intrng{T}` or `Vector{Intrng{T}}`.
+ """
+function ProcessedSpectrum(re::V, im::V, par::Dict{S, Any}, intrng::I, pn::Int, t::S) where {
+    T <: AbstractFloat, 
+    V <: AbstractVector{T}, 
+    S <: String, 
+    I <: Union{ Tuple{T, T}, Vector{Tuple{T, T}}, Missing}
 }
+    intrng isa Tuple{T, T} ? intrng = [intrng] : nothing
+        
+    end
     ProcessedSpectrum{T, V, S}(re, im, par, intrng, pn, t)
 end
 

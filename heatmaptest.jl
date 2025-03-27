@@ -8,15 +8,15 @@ using NMR
     Some useful globals
 """
 global debug = false
-spath  = joinpath(homedir(), "nmrdata/data/2025/b300b10/250318")
+spath  = joinpath(homedir(), "nmrdata/data/2025/b500b07/250326")
 
 #!TODO:  NMR.Spectrum does not work without 1i/1r for now 130325. Need to test on a zg spectrum. 
 # Need to test on a zg spectrum
 
+expno = "9"
+s = Spectrum(joinpath(spath, expno), [1], 1)
 
-s = Spectrum(spath * "/7", [1], 1)
-
-poptpath = joinpath(spath, "7")
+poptpath = joinpath(spath, expno)
 protpath = joinpath(poptpath, "popt.protocol")
 
 # testing inside of parse_popt()
@@ -34,6 +34,7 @@ GLMakie.activate!()
 fig = splatted_heatmaps(mat);
 #
 
-S = PoptSpectrum(poptpath; UI_enable = true); p.ser
+S = PoptSpectrum(poptpath; UI_enable = true);
+S.ser
 
-P = auto_ϕ_correct(S)
+#P = auto_ϕ_correct(S)

@@ -72,6 +72,7 @@ function ProcessedSpectrum(path :: AbstractString, procno :: Int)
     params = read_params(joinpath(path, "proc"))
     title = read(joinpath(path, "title"), String)
     intrng = read_intrng(joinpath(path, "intrng"))
+    println(intrng)
     return NMR.ProcessedSpectrum(re_ft, im_ft, params, intrng, procno, title)
 end
 

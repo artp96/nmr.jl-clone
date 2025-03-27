@@ -10,13 +10,10 @@ using RecipesBase
 using FFTW
 using FastTransforms
 
-#=
 using CUDA
-
-cu = CUDA.happy ? cu : identity
-array = CUDA.happy ? array : identity
-export cu
-=#
+gpu = CUDA.happy() ? cu : identity
+cpu = CUDA.happy() ? array : identity
+export gpu, cpu
 
 import Base: show, dump, /, +, *, -, copy!, in
 # include structs first
@@ -38,8 +35,8 @@ include("show.jl")
 include("makie_funcs.jl")
 include("slice_size.jl")
 include("bruker/popt.jl")
-include("phase_correction.jl")
 include("eachfibre.jl")
+include("phase_correction.jl")
 
 try
     if debug
