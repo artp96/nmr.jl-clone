@@ -20,13 +20,24 @@ function PoptSpectrum(path :: AbstractString; UI_enable = true)
 end
 
 """
-    
+    PoptSpectrum(path, procnos; kwargs...) -> PoptSpectrum
+    path :: AbstractString,
+    procnos :: AbstractArray{Int}
+____________________________________________________________________________
+Second outer constructor wrapper.
 """
-PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Popt_Spectrum(path, procnos, maximum(procnos))
+PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}; kwargs...) = Popt_Spectrum(
+    path, procnos, maximum(procnos); kwargs... )
 
 """ 
-    PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, procno :: Int; poptno = "", UI_enable = true)
-Final outer constructor to Struct to containing a multidimensional spectrum derived from a POPT array.
+    PoptSpectrum(path, procnos, procno; poptno, UI_enable) -> PoptSpectrum
+    path :: AbstractString, 
+    procnos :: AbstractArray{Int},
+    procno :: Int;
+    poptno = "", UI_enable = true)
+____________________________________________________________________________
+Final outer constructor to Struct, containing a multidimensional spectrum 
+derived from a POPT array.
 """
 function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, procno :: Int; poptno = "", UI_enable = true) 
     !isempty(poptno) && prepend!(poptno, ".")
@@ -43,8 +54,12 @@ function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, pro
     return PoptSpectrum(fid, acqu, procno, expno, name, path, protocol, ser, proc)
 end
 
-# function to get the ser matched to the given popt.protocol.n
+"""
+    fetch_serfile(path, poptno, contents; UI_enable = false) -> Vector{f64}
+____________________________________________________________________________
+Function to get the ser matched to the given popt.protocol.n
 # TODO Not working properly with UI_enable off, need to pass right match target.
+"""
 function fetch_serfile(path, poptno, contents; UI_enable = false)
     path = splitpath(path)
     path = joinpath(path[1:end-1])    
@@ -75,7 +90,10 @@ function fetch_serfile(path, poptno, contents; UI_enable = false)
 end
 
 """
-    Function to parse the popt protocol into a set of headers and only interesting columns
+    parse_PoptProtocol(file; run = 1) -> headers, cols
+____________________________________________________________________________
+Function to parse the popt protocol into a set of headers and only 
+interesting columns.
 """
 function parse_PoptProtocol(file; run = 1)
     contents = read(file, String)
@@ -109,7 +127,9 @@ function parse_PoptProtocol(file; run = 1)
 end
 
 """
-    Function to construct a table of popt.protocol data 
+    read_PoptProtocol(file)
+____________________________________________________________________________
+Function to construct a table of popt.protocol data 
 """
 function read_PoptProtocol(file)
     h, c = parse_PoptProtocol(file)
@@ -120,7 +140,9 @@ function read_PoptProtocol(file)
 end
 
 """
-    Form a dynamic regex to split the columns of data - redundant?
+    build_data_regex(headers <: Base.RegexMatchIterator{String}) -> Regex
+____________________________________________________________________________
+Form a dynamic regex to split the columns of data - redundant?
 """
 function build_data_regex(headers :: T) where T <: Base.RegexMatchIterator{String}
     #Can't natively get the length of the Iterator type
@@ -133,7 +155,11 @@ function build_data_regex(headers :: T) where T <: Base.RegexMatchIterator{Strin
 end
 
 """
-    A function to scan the dependent variable columns and deduce the array structure
+    get_ArrayPoptDims(df <: AbstractDataFrame) -> dims, idxs
+
+____________________________________________________________________________
+A function to scan the dependent variable columns and deduce the array 
+structure.
 """
 function get_ArrayPoptDims(df :: T) where T <: AbstractDataFrame
     boring_columns = ("Experiment", "Maximum point", "Minimum point", "Integral")
@@ -157,10 +183,12 @@ function get_ArrayPoptDims(df :: T) where T <: AbstractDataFrame
 end
 
 """
-    A function to take an array of integrals or intensities from experiments
-    and arrange them according to the popt protocol used.
-    Should work to take f(df, df.int), or f(df, vec) for some custom vector -
-    the purpose of this function is to order indices.
+    restructure_array(df::DataFrame, vec) -> reshape(vec)
+____________________________________________________________________________
+A function to take an array of integrals or intensities from experiments
+and arrange them according to the popt protocol used.
+Should work to take f(df, df.int), or f(df, vec) for some custom vector -
+the purpose of this function is to order indices.
 """
 function restructure_array(df::DataFrame, vec)
     #get the new array structure
