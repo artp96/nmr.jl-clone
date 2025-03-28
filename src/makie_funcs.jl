@@ -16,9 +16,10 @@ function lineplot_Complex(s :: S; procno = false, palette = nothing, kwargs...) 
 end
 
 
-function splatted_heatmaps(a :: A; vars = missing, colormap = :plasma) where {T <: AbstractFloat, A <: AbstractArray{T}}
+function splatted_heatmaps(a :: A; df = missing, colormap = :plasma) where {T <: AbstractFloat, A <: AbstractArray{T}}
     d = size(a); I = Int64
     
+    # 
     colorrange = extrema(a)
     a = eachslice(a, dims = length(d))
     n = length(a)

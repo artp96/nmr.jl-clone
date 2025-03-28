@@ -11,8 +11,24 @@ using FFTW
 using FastTransforms
 
 using CUDA
-gpu = CUDA.happy() ? cu : identity
-cpu = CUDA.happy() ? array : identity
+if has_cuda() & has_cuda_gpu()
+    @info "CUDA found. GPU mode."
+    gpu = CuArray
+    cpu = Array
+elseif has_cuda_gpu() & !has_cuda()
+    gpu = identity        
+    cpu = identity
+    @warn "CUDA gpu found but no has_cuda()! Printing CUDA info."
+    CUDA.versioninfo()
+elseif !has_cuda_gpu() & has_cuda()
+    gpu = identity        
+    cpu = identity
+    @warn "CUDA found but has_cuda_gpu() failed! Printing CUDA info."
+    CUDA.versioninfo()
+else
+    @info "No CUDA found. CPU mode."
+end
+
 export gpu, cpu
 
 import Base: show, dump, /, +, *, -, copy!, in

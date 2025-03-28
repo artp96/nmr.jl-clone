@@ -73,7 +73,7 @@ function auto_ϕ_correct(s :: P; kwargs...) where P <: PoptSpectrum#{
 #     V <: AbstractVector{C},
 #     A <: AbstractArray{C}
 # }
-    auto_ϕ_correct(eachfibre(s.ser); kwargs...)
+    fids = auto_ϕ_correct(eachfibre(s.ser); kwargs...)
     #! TODO there's a type error here 260325
     s.ser = collect(fids)
     return s
@@ -101,7 +101,7 @@ function auto_ϕ_correct(fibres :: F; kwargs...) where {F <: fibreIterator}
         end
         ifft!(f)
     end
-    
+    return fibres
 end
 
 """

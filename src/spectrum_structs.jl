@@ -47,7 +47,6 @@ function ProcessedSpectrum(re::V, im::V, par::Dict{S, Any}, intrng::I, pn::Int, 
 }
     intrng isa Tuple{T, T} ? intrng = [intrng] : nothing
         
-    end
     ProcessedSpectrum{T, V, S}(re, im, par, intrng, pn, t)
 end
 
