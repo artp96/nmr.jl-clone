@@ -1,6 +1,7 @@
 
 
 PoptSpectrum(path :: AbstractString, procno :: Int; kwargs...) = Popt_Spectrum(path, [procno], procno; kwargs...)
+
 """
     PoptSpectrum(path :: AbstractString; UI_enable = true)
 First outer constructor for simple user interface mode."""
@@ -94,6 +95,7 @@ end
 ____________________________________________________________________________
 Function to parse the popt protocol into a set of headers and only 
 interesting columns.
+Wrapped by read_PoptProtocol to give a DataFrame
 """
 function parse_PoptProtocol(file; run = 1)
     contents = read(file, String)
@@ -127,7 +129,7 @@ function parse_PoptProtocol(file; run = 1)
 end
 
 """
-    read_PoptProtocol(file)
+    read_PoptProtocol(file) -> DataFrame
 ____________________________________________________________________________
 Function to construct a table of popt.protocol data 
 """
@@ -155,11 +157,12 @@ function build_data_regex(headers :: T) where T <: Base.RegexMatchIterator{Strin
 end
 
 """
-    get_ArrayPoptDims(df <: AbstractDataFrame) -> dims, idxs
+    get_ArrayPoptDims(df <: AbstractDataFrame) -> dims, axes
 
 ____________________________________________________________________________
 A function to scan the dependent variable columns and deduce the array 
-structure.
+structure, yielding the dimensions of the Popt experiment and the x,y,z 
+axes a NamedTuple of (:Variable, [Values]) pairs.
 """
 function get_ArrayPoptDims(df :: T) where T <: AbstractDataFrame
     boring_columns = ("Experiment", "Maximum point", "Minimum point", "Integral")
@@ -174,12 +177,16 @@ function get_ArrayPoptDims(df :: T) where T <: AbstractDataFrame
     vals = unique.(eachcol(vars))
     # must be a Tuple
     dims = length.(vals)
-    reverse!(dims)
     debug && println(dims)
+    indices = NamedTuple(zip(Symbol.(h), vals))
+    
+    # popt always does the last variable first, which julia sees as the reverse of column-
+    # major indexing, so the returned variables should be reversed
+    reverse!(dims)
     dims = tuple.(dims...)
-
-    indices = Dict{String, Vector}(zip(h, vals))
-    return dims, indices
+    # reversing a named tuple only reverses the key order, which is appropriate 
+    idxs = reverse(indices)
+    return dims, idxs
 end
 
 """

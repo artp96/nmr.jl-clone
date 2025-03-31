@@ -27,7 +27,7 @@ protpath = joinpath(poptpath, "popt.protocol.999")
 file = protpath; contents = read(file, String)
 
 df = read_PoptProtocol(file);
-h = get_ArrayPoptDims(df);
+dims, vars = get_ArrayPoptDims(df)
 mat = restructure_array(df, df.var"Maximum point");
 
 using GLMakie
@@ -35,10 +35,9 @@ GLMakie.activate!()
 #heatmap(mat)
 #! TODO need to get the dims and variables from this function instead, so restructure_array() wraps an 
 # get_array_structure(df) -> (dims, axis_variables) type setup, then
-fig = splatted_heatmaps(df);
+fig = splatted_heatmaps(df)
 #
 
-S = PoptSpectrum(poptpath; UI_enable = true);
-S.ser
+S = PoptSpectrum(poptpath; UI_enable = true)
 
 #P = auto_ϕ_correct(S)

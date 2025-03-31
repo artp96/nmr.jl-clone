@@ -133,10 +133,9 @@ Following Bruker convention:
 - **name**: Experiment name
 - **expno**: Experiment number if, e.g., part of a Bruker dataset
 - **fpath**: File path should point to the correct protocol with numerical suffix
-- **protocol**: Processed POPT protocol file
+- **protocol**: Processed POPT protocol, a named tuple of Popt variables
 - **ser**: N-dimensional full spectrum from saved ser, may not always exist 
-- **proc** Bruker-processed POPT spectrum (f1p ≤ δ ≤ f2p).
-- **vars**: Dict{S, Vector{T}} - array of POPT variables
+- **proc** Bruker-processed POPT spectrum, δ ∈ [f1p...f2p].
 
  ***TODO*** 
  1. get working for N-dimensional spectra
@@ -155,10 +154,9 @@ mutable struct PoptSpectrum{
     expno :: Int
     name :: S
     fpath :: S # Should point to the correct protocol with numerical suffix
-    protocol :: D where D <: AbstractDataFrame
+    protocol :: NT where NT <: NamedTuple
     ser :: A # raw 2D spectrum, may not always exist
     proc :: ProcessedSpectrum # Bruker processed POPT output, as array
-    vars :: Dict{S, Vector{T}}
 
     """
         PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fp :: S, prot :: DF, ser :: V, proc :: P) where { 
@@ -170,7 +168,7 @@ mutable struct PoptSpectrum{
         P <: ProcessedSpectrum
         }
 
-Inner constructor to restructure the popt array automatically, & store the popt vars.
+Inner constructor to restructure the popt array automatically, & store the popt vars extracted from a DataFrame.
 Outer constructors should be used to get all the variables from a popt file.
     """
     function PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fp :: S, prot :: DF, ser :: V, proc :: P) where {
@@ -196,7 +194,7 @@ Outer constructors should be used to get all the variables from a popt file.
         serdims = tuple(length(ser) ÷ prod(dims), dims...)
         ser = isempty(ser) ? Complex(Float64[]) : reshape(ser, serdims)
         A = typeof(ser)
-        return new{T, C, V, A}(f, a, p, e, n, fp, prot, ser, proc, vars)
+        return new{T, C, V, A}(f, a, p, e, n, fp, vars, ser, proc)
     end
 
 end
