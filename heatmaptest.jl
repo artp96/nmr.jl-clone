@@ -39,6 +39,10 @@ fig = splatted_heatmaps(df);
 #
 
 S = PoptSpectrum(poptpath; UI_enable = true);
-
-#S = auto_ϕ_correct(S, 2.105)
+using BenchmarkTools
+import NMR: trim_spectrum
+fibs = eachfibre(S.ft * S.ser)
+idxs = trim_spectrum(S, 2.104)
+b1 = @benchmark p₁ = auto_ϕ_correct(fibs[1], idxs)
+b2 = @benchmark p₂ = auto_ϕ_correct2(fibs[1], idxs)
 

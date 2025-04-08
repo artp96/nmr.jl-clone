@@ -144,7 +144,7 @@ function auto_ϕ_correct2(fibres :: F, idxs; kwargs...) where {F <: fibreIterato
 end
 
 function auto_ϕ_correct2(s :: V, idxs; 
-            L :: Function = (y -> sum(y[y .< 0.].^2)), 
+                          L :: Function = _imag_loss, 
                         ϕ₀:: T = 0.,
                         ϕ₁ :: T = 0.,
                         tol = 1e-3,
@@ -156,15 +156,15 @@ function auto_ϕ_correct2(s :: V, idxs;
     idx1, idx2 = idxs
     s_ = @view s[idx1:idx2]
     
-    f₀(s, ϕ₀) = ((s, ϕ₀) -> ϕ_correct(s, ϕ₀, ϕ₁))
+    f₀(s, ϕ₀) = ϕ_correct(s, ϕ₀, ϕ₁)
     ϕ₀ = _bisection_solver(f₀, s_, 1e-4, L; y0 = ϕ₀)
 
     
-    f₁(s, ϕ₁) = ((s, ϕ₁) -> ϕ_correct(s, ϕ₀, ϕ₁))
+    f₁(s, ϕ₁) = ϕ_correct(s, ϕ₀, ϕ₁)
     ϕ₁ = _bisection_solver(f₁, s_, 1e-4, L; y0 = ϕ₁)
 
-    s = ϕ_correct(s, [ϕ₀, ϕ₁])
-    return s, ϕ_opt
+    s = ϕ_correct(s, ϕ₀, ϕ₁)
+    return s, (ϕ₀, ϕ₁)
 end
 
 
@@ -271,4 +271,4 @@ _imag_loss(S :: A) where A <: AbstractArray{<: Complex} = sum(imag(S).^2)
 _norm_loss(S :: A) where A <: AbstractArray{<: Complex} = norm((imag(S)))
 L = _imag_loss
 
-export auto_ϕ_correct, ϕ_correct
+export auto_ϕ_correct, ϕ_correct, auto_ϕ_correct2, trim_spectrum
