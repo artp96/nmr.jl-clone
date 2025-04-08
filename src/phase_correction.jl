@@ -46,8 +46,8 @@ end
 Automatic phase correction function to take a 1-D spectrum and apply zeroth and 
 first order phase corrections ϕ₀, ϕ₁.
 """
-function auto_ϕ_correct2(s :: V, idxs; 
-            f :: Function = (y -> sum(y[y .< 0.].^2)), 
+function auto_ϕ_correct(s :: V, idxs; 
+            f :: Function = (y -> sum(y[ y .< 0. ] .^ 2)), 
                         ϕ₀:: T = 0.,
                         ϕ₁ :: T = 0.,
                         tol = 1e-3,
@@ -82,9 +82,10 @@ import Base.Threads
 _________________________________________________________________________________
 Phase correct each 1-D fibre of a POPT array serfile, returning a corrected array.
 """
-function auto_ϕ_correct(s :: P, δ; kwargs...) where P <: PoptSpectrum 
+function auto_ϕ_correct(s :: P, δ::Real; kwargs...) where P <: PoptSpectrum
     idxs = trim_spectrum(s, δ)
-    auto_ϕ_correct(eachfibre(s.ft * s.ser), idxs; kwargs...)
+    fibres = eachfibre(s.ft * s.ser)
+    auto_ϕ_correct(fibres, idxs; kwargs...)
 end
 
 """
@@ -93,7 +94,6 @@ ________________________________________________________________________________
 Inner function to iterate over fibres.
 """
 function auto_ϕ_correct(fibres :: F, idxs; kwargs...) where {F <: fibreIterator} 
-    
     isempty(idxs) && @error(AssertionError("Empty tuple propagated to fibreIterator auto_ϕ_correct, idxs should be defined at this point."))
     if debug
         println("idxs $idxs")
@@ -104,7 +104,6 @@ function auto_ϕ_correct(fibres :: F, idxs; kwargs...) where {F <: fibreIterator
     Threads.@threads for f in fibres
         
         f .= auto_ϕ_correct(f, idxs; kwargs...)[1]
-
 
         if debug
             lock(ctr_lock)
@@ -119,14 +118,17 @@ end
 
 function auto_ϕ_correct2(fibres :: F, idxs; kwargs...) where {F <: fibreIterator} 
     
-    isempty(idxs) && @error(AssertionError("Empty tuple propagated to fibreIterator auto_ϕ_correct, idxs should be defined at this point."))
+    isempty(idxs) && @error(AssertionError(
+        "Empty tuple propagated to fibreIterator auto_ϕ_correct, idxs should be defined at this point."
+    ))
+
     if debug
         println("idxs $idxs")
         count = 0
     end
     
     # multithreading makes a big difference on large arrays.
-    Threads.@threads for f in fibres
+    for f in fibres
         
         f .= auto_ϕ_correct2(f, idxs; kwargs...)[1]
 
@@ -155,10 +157,10 @@ function auto_ϕ_correct2(s :: V, idxs;
     s_ = @view s[idx1:idx2]
     
     f₀(s, ϕ₀) = ((s, ϕ₀) -> ϕ_correct(s, ϕ₀, ϕ₁))
-    f₁(s, ϕ₁) = ((s, ϕ₁) -> ϕ_correct(s, ϕ₀, ϕ₁))
+    ϕ₀ = _bisection_solver(f₀, s_, 1e-4, L; y0 = ϕ₀)
 
     
-    ϕ₀ = _bisection_solver(f₀, s_, 1e-4, L; y0 = ϕ₀)
+    f₁(s, ϕ₁) = ((s, ϕ₁) -> ϕ_correct(s, ϕ₀, ϕ₁))
     ϕ₁ = _bisection_solver(f₁, s_, 1e-4, L; y0 = ϕ₁)
 
     s = ϕ_correct(s, [ϕ₀, ϕ₁])
