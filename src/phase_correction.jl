@@ -19,9 +19,9 @@ using OptimizationOptimJL
     - `Vector{C}`: The corrected real part of the spectrum, ie.
         the endomorphism 𝑓:𝑠 -> 𝑠.
 """
-ϕ_correct(r::V, 𝑖::V, ϕ₀ :: T; ϕ₁::T=0.0) where {T <: AbstractFloat, V <: AbstractVector{T}} = ϕ_correct(s = Complex{T}.(r, 𝑖), ϕ₀; ϕ₁)
+ϕ_correct(r::V, 𝑖::V, ϕ₀ :: T, ϕ₁::T=0.0) where {T <: AbstractFloat, V <: AbstractVector{T}} = ϕ_correct(s = Complex{T}.(r, 𝑖), ϕ₀, ϕ₁)
 
-function ϕ_correct(s::V, ϕ₀; ϕ₁ = 0.) where { C <: Complex, V <: AbstractVector{C} }    
+function ϕ_correct(s::V, ϕ₀, ϕ₁) where { C <: Complex, V <: AbstractVector{C} }    
     ϕ₀, ϕ₁ = deg2rad(ϕ₀), deg2rad(ϕ₁);
     n = length(s)
     # normalised frequency axis
@@ -30,8 +30,8 @@ function ϕ_correct(s::V, ϕ₀; ϕ₁ = 0.) where { C <: Complex, V <: Abstract
     return s .* ϕ
 end
 
-# auto phase should take a [[transformed]] spectrum
-function auto_ϕ_correct(s :: V; 
+"""
+    auto_ϕ_correct(s :: V; 
             f :: Function = (y -> sum(y[y .< 0.].^2)), 
                         ϕ₀:: T = 0.,
                         ϕ₁ :: T = 0.,
@@ -42,12 +42,26 @@ function auto_ϕ_correct(s :: V;
             C <: Complex, 
             V <: AbstractVector{C}
             }
-    idx1, idx2, len = trim_spectrum(s; pivot = pivot_ppm)
+-------------------------------------------------------------------------------
+Automatic phase correction function to take a 1-D spectrum and apply zeroth and 
+first order phase corrections ϕ₀, ϕ₁.
+"""
+function auto_ϕ_correct2(s :: V, idxs; 
+            f :: Function = (y -> sum(y[y .< 0.].^2)), 
+                        ϕ₀:: T = 0.,
+                        ϕ₁ :: T = 0.,
+                        tol = 1e-3,
+                        ) where {
+            T <: AbstractFloat,
+            C <: Complex, 
+            V <: AbstractVector{C}
+            }
+    idx1, idx2 = idxs
     s_ = @view s[idx1:idx2]
     # Must meet criteria for OptimizationFunction, AutomaticDifferentiable
     function objective(ϕ, s_)
         ϕ₀, ϕ₁ = ϕ
-        y = ϕ_correct(s_, ϕ₀; ϕ₁ = ϕ₁) |> real
+        y = ϕ_correct(s_, ϕ₀, ϕ₁) |> real
         # f can be any loss function, but we seek positive phase for Re(s)
         return f(y)
     end
@@ -56,7 +70,7 @@ function auto_ϕ_correct(s :: V;
     optF = OptimizationFunction(objective, AutoForwardDiff())
     prob = OptimizationProblem(optF, ϕ, s)
     ϕ_opt = solve(prob, BFGS()) .% 360
-    s = ϕ_correct(s, ϕ_opt[1]; ϕ₁ = ϕ_opt[2])
+    s = ϕ_correct(s, ϕ_opt[1], ϕ_opt[2])
     return s, ϕ_opt
 end
 
@@ -65,62 +79,112 @@ import Base.Threads
 # function to inplace auto
 """
     auto_ϕ_correct(S0 <: PoptSpectrum) -> S1 <: PoptSpectrum 
+_________________________________________________________________________________
 Phase correct each 1-D fibre of a POPT array serfile, returning a corrected array.
 """
-function auto_ϕ_correct(s :: P; kwargs...) where P <: PoptSpectrum#{
-#     T <: AbstractFloat,
-#     C <: Complex{T},
-#     V <: AbstractVector{C},
-#     A <: AbstractArray{C}
-# }
-    fids = auto_ϕ_correct(eachfibre(s.ser); kwargs...)
-    #! TODO there's a type error here 260325
-    s.ser = collect(fids)
-    return s
+function auto_ϕ_correct(s :: P, δ; kwargs...) where P <: PoptSpectrum 
+    idxs = trim_spectrum(s, δ)
+    auto_ϕ_correct(eachfibre(s.ft * s.ser), idxs; kwargs...)
 end
 
 """
     auto_ϕ_correct(fibs :: fibreIterator)
+_________________________________________________________________________________
 Inner function to iterate over fibres.
 """
-function auto_ϕ_correct(fibres :: F; kwargs...) where {F <: fibreIterator} 
+function auto_ϕ_correct(fibres :: F, idxs; kwargs...) where {F <: fibreIterator} 
     
+    isempty(idxs) && @error(AssertionError("Empty tuple propagated to fibreIterator auto_ϕ_correct, idxs should be defined at this point."))
     if debug
+        println("idxs $idxs")
         count = 0
     end
+    
     # multithreading makes a big difference on large arrays.
     Threads.@threads for f in fibres
         
-        fft!(f)
-        f .= auto_ϕ_correct(f; kwargs...)[1]
+        f .= auto_ϕ_correct(f, idxs; kwargs...)[1]
+
+
         if debug
             lock(ctr_lock)
             count += 1
-            debug && println(count)
+            debug && println(count * "Updated fibre: ", real(f[1:5]))  # Debug view
             unlock(ctr_lock)
         end
-        ifft!(f)
     end
     return fibres
 end
 
-"""
-    trim_spectrum(S) -> (idx1, idx2, new_length)
 
-Ends of the spectrum are often distorted by DSP, and look ugly in plots or have weird phase errors.
+function auto_ϕ_correct2(fibres :: F, idxs; kwargs...) where {F <: fibreIterator} 
     
-"""
-function trim_spectrum(S; pc = 0.01, pivot = false)
-    # default trim
-    if !pivot
-        n = length(S)
-        idx1, idx2 = ceil(Int,pc*n), floor(Int,(1-pc)*n)
-        return (idx1, idx2, idx1-idx2)
+    isempty(idxs) && @error(AssertionError("Empty tuple propagated to fibreIterator auto_ϕ_correct, idxs should be defined at this point."))
+    if debug
+        println("idxs $idxs")
+        count = 0
     end
+    
+    # multithreading makes a big difference on large arrays.
+    Threads.@threads for f in fibres
+        
+        f .= auto_ϕ_correct2(f, idxs; kwargs...)[1]
+
+
+        if debug
+            lock(ctr_lock)
+            count += 1
+            debug && println(count * "Updated fibre: ", real(f[1:5]))  # Debug view
+            unlock(ctr_lock)
+        end
+    end
+    return fibres
+end
+
+function auto_ϕ_correct2(s :: V, idxs; 
+            L :: Function = (y -> sum(y[y .< 0.].^2)), 
+                        ϕ₀:: T = 0.,
+                        ϕ₁ :: T = 0.,
+                        tol = 1e-3,
+                        ) where {
+            T <: AbstractFloat,
+            C <: Complex, 
+            V <: AbstractVector{C}
+            }
+    idx1, idx2 = idxs
+    s_ = @view s[idx1:idx2]
+    
+    f₀(s, ϕ₀) = ((s, ϕ₀) -> ϕ_correct(s, ϕ₀, ϕ₁))
+    f₁(s, ϕ₁) = ((s, ϕ₁) -> ϕ_correct(s, ϕ₀, ϕ₁))
+
+    
+    ϕ₀ = _bisection_solver(f₀, s_, 1e-4, L; y0 = ϕ₀)
+    ϕ₁ = _bisection_solver(f₁, s_, 1e-4, L; y0 = ϕ₁)
+
+    s = ϕ_correct(s, [ϕ₀, ϕ₁])
+    return s, ϕ_opt
 end
 
 
+"""
+    trim_spectrum(S, δ) -> (idx1, idx2, new_length)
 
+Ends of the spectrum are often distorted by DSP, and look ugly in plots or have weird phase errors.
+-   δ   a peak in ppm, if given will indices for the region δ +- 2 Hz 
+"""
+function trim_spectrum(s :: S, δ = (); pc = 0.01) where S <: AbstractSpectrum
+    # default trim, short back & sides
+    if isempty(δ)
+        n = size(S)[1]
+        idx1, idx2 = ceil(Int, pc * n), floor(Int, (1 - pc)n)
+     
+    # Otherwise phase around a specific peak.
+    else 
+        idx1 = ppmtoindex(s, δ - 3)
+        idx2 = ppmtoindex(s, δ + 3)
+    end
+    return (idx1, idx2)
+end
 
 """
     _bisection_solver(f :: F1, x :: A, tol, loss :: F2; y0 = missing, max_iter = 1e3) where {

@@ -1,4 +1,6 @@
 intrng(s::Spectrum) = s[s.default_proc].intrng
+intrng(p::PoptSpectrum) = p.proc.intrng
+
 
 function intrng_indices(s::Spectrum)
     rng = intrng(s)

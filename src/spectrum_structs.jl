@@ -128,7 +128,7 @@ end
 POPT array of 1-D spectra.
 
 Following Bruker convention:
-- **fid**: Complex FID from the top-level expno 
+- **ft**: an fft_plan for efficient on the fly fft of ser
 - **acqu**: Acquisition parameters, mostly from `acqu` file for Bruker data
 - **name**: Experiment name
 - **expno**: Experiment number if, e.g., part of a Bruker dataset
@@ -144,18 +144,17 @@ Following Bruker convention:
 mutable struct PoptSpectrum{
         T <: AbstractFloat,
         C <: Complex{T},
-        V <: AbstractVector{C},
         A <: AbstractArray{C}
         } <: AbstractSpectrum
 
-    fid :: V # should probably shadow the ser if it exists
+    ft :: FT where FT <: AbstractFFTs.Plan # store for fast fft of this object 
     acqu :: Dict{S, Any}
     procno :: Int # for popt, usually 899, 898, etc.
     expno :: Int
     name :: S
     fpath :: S # Should point to the correct protocol with numerical suffix
     protocol :: NT where NT <: NamedTuple
-    ser :: A # raw 2D spectrum, may not always exist
+    ser :: A # transformed 2-D spectrum
     proc :: ProcessedSpectrum # Bruker processed POPT output, as array
 
     """
@@ -171,7 +170,7 @@ mutable struct PoptSpectrum{
 Inner constructor to restructure the popt array automatically, & store the popt vars extracted from a DataFrame.
 Outer constructors should be used to get all the variables from a popt file.
     """
-    function PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fp :: S, prot :: DF, ser :: V, proc :: P) where {
+    function PoptSpectrum(a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fpath :: S, prot :: DF, ser :: V, proc :: P) where {
         T <: AbstractFloat,
         C <: Complex{T},
         V <: AbstractVector{C},
@@ -194,10 +193,16 @@ Outer constructors should be used to get all the variables from a popt file.
         serdims = tuple(length(ser) ÷ prod(dims), dims...)
         ser = isempty(ser) ? Complex(Float64[]) : reshape(ser, serdims)
         A = typeof(ser)
-        return new{T, C, V, A}(f, a, p, e, n, fp, vars, ser, proc)
+        
+        ft = plan_fft(ser, [1])
+        
+        
+        return new{T, C, A}(ft, a, p, e, n, fpath, vars, ser, proc)
     end
-
 end
+
+import FFTW: fft
+fft(s :: P) where P <:  PoptSpectrum = s.ft * s.ser
 
 """
     PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fp :: S, prot :: DF, ser :: V, proc :: P) where {
@@ -209,16 +214,18 @@ end
 
 Outer constructor to convert raw fid/ser to complex fid/ser.
 """
-function PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fp :: S, prot :: DF, ser :: V, proc :: P) where {
+function PoptSpectrum(a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fp :: S, prot :: DF, ser :: V, proc :: P) where {
         T <: AbstractFloat, V <: AbstractVector{T}, S <: String, DF <: AbstractDataFrame, P <: ProcessedSpectrum
         }
-        f = split_fid(f)
         ser = split_fid(ser)
-        return PoptSpectrum(f, a, p, e, n, fp, prot, ser, proc)
+        return PoptSpectrum(a, p, e, n, fp, prot, ser, proc)
 end
 
-Base.getindex(s::PoptSpectrum, n::Int) = n == 1 ? s.proc : @error("getindex(s, n) not defined for n ≠ 1 on POPT spectra.")
+import Base.size
+Base.size(p :: P) where P <: PoptSpectrum = size(p.ser)
 
+
+Base.getindex(s::PoptSpectrum, n::Int) = n == 1 ? s.proc : @error("getindex(s, n) not defined for n ≠ 1 on POPT spectra.")
 Base.getindex(s::PoptSpectrum, ::Colon) = real(s.ser)
 Base.getindex(s::PoptSpectrum, dims::NTuple{Union{Colon,Int}}) = real(s.ser[dims...])
 Base.getindex(s::PoptSpectrum, a::AbstractArray) = s.proc[a]
@@ -271,4 +278,4 @@ function split_fid(ser :: A) where {T, N, A <: AbstractArray{T, N}}
     return ser
 end
 
-export Spectrum, PoptSpectrum, ProcessedSpectrum, AbstractSpectrum
+export Spectrum, PoptSpectrum, ProcessedSpectrum, AbstractSpectrum, size

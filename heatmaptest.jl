@@ -3,7 +3,7 @@ using NMR
 #    pkg needed to resolve dependencies while developing
 
 
-
+using BenchmarkTools
 """
     Some useful globals
 """
@@ -35,9 +35,10 @@ GLMakie.activate!()
 #heatmap(mat)
 #! TODO need to get the dims and variables from this function instead, so restructure_array() wraps an 
 # get_array_structure(df) -> (dims, axis_variables) type setup, then
-fig = splatted_heatmaps(df)
+fig = splatted_heatmaps(df);
 #
 
-S = PoptSpectrum(poptpath; UI_enable = true)
+S = PoptSpectrum(poptpath; UI_enable = true);
 
-#P = auto_ϕ_correct(S)
+#S = auto_ϕ_correct(S, 2.105)
+

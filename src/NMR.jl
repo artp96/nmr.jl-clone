@@ -1,7 +1,8 @@
 module NMR
 
+using ProgressBars
 using DataFrames 
-using GLMakie
+using GLMakie; GLMakie.activate!()
 using LaTeXStrings
 using Interpolations
 using LinearAlgebra: norm, normalize, dot

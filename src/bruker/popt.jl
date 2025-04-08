@@ -43,7 +43,7 @@ derived from a POPT array.
 function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, procno :: Int; poptno = "", UI_enable = true) 
     !isempty(poptno) && prepend!(poptno, ".")
     # below, changed joinpath to omit "fid", can't find this anywhere ?
-    fid = float(read_bruker_binary(path))
+    #fid = float(read_bruker_binary(path))
     acqu = read_params(joinpath(path, "acqu"))
     protocol = read_PoptProtocol(joinpath(path, "popt.protocol" * poptno))
     ser = fetch_serfile(path, poptno, contents; UI_enable = UI_enable)
@@ -52,7 +52,7 @@ function PoptSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, pro
     # Popt spectra arrays need only 1 procno and 1 serfile
     proc_path = joinpath(path, "pdata", string(procno))
     proc = ProcessedSpectrum(proc_path, procno)
-    return PoptSpectrum(fid, acqu, procno, expno, name, path, protocol, ser, proc)
+    return PoptSpectrum(acqu, procno, expno, name, path, protocol, ser, proc)
 end
 
 """

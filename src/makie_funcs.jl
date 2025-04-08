@@ -57,25 +57,7 @@ function splatted_heatmaps(a :: A, dims :: T, vars :: NT; colormap = :plasma) wh
         # Makie tries to automatically sort axis labels - fix this
         ax.xreversed = (x_ax[end] < x_ax[1]) 
         ax.yreversed = (y_ax[end] < y_ax[1])
-        # Only keep x-ticks on bottom row
-        if row != grid_h
-            hidexdecorations!(ax)
-            ax.xticksvisible = false
-            ax.xlabelvisible = false
-        end
-
-        # Only keep y-ticks on left column
-        if col != 1
-            hideydecorations!(ax)
-            ax.yticksvisible = false
-            ax.ylabelvisible = false
-        end
-        # ⬆ Hide top spine always (optional)
-        hidespines!(ax, :t)
-
-        # ➡ Hide right spine always (optional)
-        hidespines!(ax, :r)
-        heatmap!(ax, x_ax, y_ax,
+        hm = heatmap!(ax, x_ax, y_ax,
                  slices[idx], 
                  colormap = colormap,
                  colorrange = colorrange
@@ -99,6 +81,24 @@ function splatted_heatmaps(a :: A, dims :: T, vars :: NT; colormap = :plasma) wh
 
         # ➡ Hide right spine always (optional)
         hidespines!(ax, :r)
+
+        cursorpos = Observable(Point2f(0, 0))
+
+        on(events(ax).mouseposition) do pos
+            cursorpos[] = pos
+        end
+        # TODO! add a tooltip on hover
+        #tooltip!(hm, cursorpos) do p
+        # Convert screen position to data coordinates
+        #    xdata, ydata = to_world(ax.scene, p)
+        #     xi = findfirst(>(xdata), x_ax)
+        #     yi = findfirst(>(ydata), y_ax)
+        #     if isnothing(xi) || isnothing(yi)
+        #         return ""
+        #     end
+        #     val = slices[idx][yi, xi]
+        #     return "x=$(x[xi]), y=$(y[yi])\nval=$(round(val, digits=3))"
+        # end
     end
 
     Colorbar(fig[:, grid_w + 1], colormap = colormap, colorrange = colorrange, label = "Intensity a.u.")
@@ -143,5 +143,4 @@ end
 Convenience wrapper to splat the integrals from a popt dataframe.
 """
 splatted_heatmaps(df :: D; kwargs...) where D <: AbstractDataFrame = splatted_heatmaps(df.Integral, df; kwargs...)
-
 export heatmap_Popt, splatted_heatmaps

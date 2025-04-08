@@ -21,12 +21,12 @@ limits(o1p, sw, sf, bf) = begin
 end
 
 function in(δ, s::S) where S <: AbstractSpectrum
-    lo,hi = limits(s)
+    lo, hi = limits(s)
     lo < δ < hi
 end
 
 function chemical_shifts(s::S) where S <: AbstractSpectrum 
-    lo,hi = limits(s)
+    lo, hi = limits(s)
     range(hi; stop=lo, length=length(s[:]))
 end
 
@@ -38,7 +38,7 @@ bf in MHz and sr in Hz.
 """
 function ppmtomhz_abs(δ, bf, sr = 0.0)
     bf = bf * 1e6
-    1e-6(bf+sr)δ + bf + sr
+    1e-6(bf + sr)δ + bf + sr
 end
 
 """
@@ -67,21 +67,31 @@ sf and bf in MHz.
 sr(sf, bf) = 1e6(sf - bf)
 
 """
-    ppmtoindex(::Spectrum, δ)
+    ppmtoindex(<:AbstractSpectrum, δ)
 Return the index in the processed spectrum corresponding to
 chemical shift δ.
 """
 function ppmtoindex(s :: S, δ) where S <: AbstractSpectrum
-    min_δ ,max_δ = limits(s)
+    min_δ, max_δ = limits(s)
     @. Int(cld(s["SI"]*(max_δ - δ), (max_δ - min_δ)))
 end
 
+"""
+    ppmtoindex(::PoptSpectrum, δ)
+Return the index in the POPT spectrum corresponding to
+chemical shift δ. In POPT, this is based on TD, not SI.
+"""
+function ppmtoindex(p :: P, δ) where P <: PoptSpectrum
+    min_δ, max_δ = limits(p)
+    @. Int(cld(p["TD"]*(max_δ - δ), (max_δ - min_δ)))
+end
+
 function ppmtoindex(s :: S, rng::Tuple{Float64,Float64}) where S <: AbstractSpectrum
-    r1,r2 = rng
+    r1, r2 = rng
     if r1>r2
-        ppmtoindex(s,r1):ppmtoindex(s,r2)
+        ppmtoindex(s, r1):ppmtoindex(s, r2)
     else
-        ppmtoindex(s,r2):ppmtoindex(s,r1)
+        ppmtoindex(s, r2):ppmtoindex(s, r1)
     end
 end
 
