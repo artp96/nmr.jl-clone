@@ -15,7 +15,7 @@
 
 
 limits(s :: S) where S <: AbstractSpectrum = limits(s["O1P"], s["SW"], s["SF"], s["BF1"])
-limits(o1p, sw, sf, bf) = begin
+function limits(o1p, sw, sf, bf) 
     shift = 1e6(bf-sf)/bf
     (o1p - sw/2 + shift, o1p + sw/2 + shift)
 end

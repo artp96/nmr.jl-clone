@@ -235,7 +235,7 @@ function _bisection_solver(f :: F1, X :: A, loss :: F2;
     else
         ϕᵣ, εᵣ = idx*π, max
     end
-    iter = 1
+    iter = 0 
     ϕₙ = 0.
     εₙ = 0.
     while iter < max_iter && tol < abs((εᵣ-εₗ)/εᵣ)
