@@ -173,25 +173,6 @@ function auto_ϕ_correct2(s :: V, idxs;
 end
 
 
-"""
-    trim_spectrum(S, δ) -> (idx1, idx2)
-
-Ends of the spectrum are often distorted by DSP, and look ugly in plots or have weird phase errors.
--   δ   a peak in ppm, if given will indices for the region δ +- 2 Hz 
-"""
-function trim_spectrum(s :: S, δ = (); pc = 0.01) where S <: AbstractSpectrum
-    # default trim, short back & sides
-    if isempty(δ)
-        n = size(S)[1]
-        idx1, idx2 = ceil(Int, pc * n), floor(Int, (1 - pc)n)
-     
-    # Otherwise phase around a specific peak.
-    else 
-        idx1 = ppmtoindex(s, δ + 3)
-        idx2 = ppmtoindex(s, δ - 3)
-    end
-    return (idx1, idx2)
-end
 
 import GLMakie: lines
 """
@@ -322,7 +303,7 @@ _imag_loss(S :: A) where A <: AbstractArray{<: Complex} = -sum(imag(S).^2)
 _norm_loss(S :: A) where A <: AbstractArray{<: Complex} = norm(real(S))
 L = _imag_loss
 
-export auto_ϕ_correct, ϕ_correct, auto_ϕ_correct2, trim_spectrum
+export auto_ϕ_correct, ϕ_correct, auto_ϕ_correct2
 
 
 const test_tols = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]

@@ -2,6 +2,10 @@
 const S = String
 "Integration range in the frequency domain, values given in ppm."
 const Intrng{T} = Tuple{T, T} where T <: AbstractFloat
+
+"""
+    Abstract Supertype of spectrum structs.
+"""
 abstract type AbstractSpectrum end
 
 """
@@ -12,7 +16,6 @@ Processed (frequency domain) NMR spectrum. Parameters follow the Bruker conventi
 - **intrng**: list of integration ranges
 - **title**: Spectrum title
 """
-
 mutable struct ProcessedSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, S <: String} <: AbstractSpectrum
     re_ft :: V
     im_ft :: V
@@ -35,15 +38,24 @@ mutable struct ProcessedSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, S <
 end
 
  """
-    Outer Constructor Definition
-
-Creates a `ProcessedSpectrum` object, accepting `Intrng{T}` or `Vector{Intrng{T}}`.
- """
-function ProcessedSpectrum(re::V, im::V, par::Dict{S, Any}, intrng::I, pn::Int, t::S) where {
+    ProcessedSpectrum(re::V, im::V, par::D, intrng::I, pn::Int, t::S) where {
     T <: AbstractFloat, 
     V <: AbstractVector{T}, 
     S <: String, 
-    I <: Union{ Tuple{T, T}, Vector{Tuple{T, T}}, Missing}
+    I <: Union{ Tuple{T, T}, Vector{Tuple{T, T}}, Missing},
+    D <: AbstractDict
+    }
+ -----------------------------------------------------------------------------------------
+    Outer Constructor Definition
+
+    Creates a `ProcessedSpectrum` object, accepting `Intrng{T}` or `Vector{Intrng{T}}`.
+ """
+function ProcessedSpectrum(re::V, im::V, par::D, intrng::I, pn::Int, t::S) where {
+    T <: AbstractFloat, 
+    V <: AbstractVector{T}, 
+    S <: String, 
+    I <: Union{ Tuple{T, T}, Vector{Tuple{T, T}}, Missing},
+    D <: AbstractDict
 }
     intrng isa Tuple{T, T} ? intrng = [intrng] : nothing
         
@@ -55,7 +67,15 @@ Base.getindex(p::ProcessedSpectrum, param::AbstractString) = p.params[param]
 Base.getindex(p::ProcessedSpectrum, ::Colon) = p.re_ft
 Base.getindex(p::ProcessedSpectrum, a::AbstractArray) = p.re_ft[a]
 Base.view(p::ProcessedSpectrum, v) = @view p.re_ft[v]
+Base.abs(p::ProcessedSpectrum) = abs.(complex(p))
 
+#Functional shorthand into procno spectra
+import Base.complex, Base.imag, Base.real
+Base.real(p::P) where P<:ProcessedSpectrum = p.re_ft
+Base.imag(p::P) where P<:ProcessedSpectrum = im * p.im_ft
+Base.complex(p::P) where P<:ProcessedSpectrum = p.re_ft .+ im * p.im_ft
+
+Base.size(p :: P) where P <: ProcessedSpectrum = size(p.re_ft)
 """
 Unprocessed NMR experiment: FID and any associated processed spectra.
 
@@ -89,7 +109,10 @@ mutable struct Spectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, 
             throw(ArgumentError("The split FID must be of type AbstractVector{$C}, but got $(typeof(f))"))
         end
         W = typeof(f)
-        return new{T, W, P}(f, a, p, d, n, e)
+        # Copy the acqupars into each procno
+        s = new{T, W, P}(f, a, p, d, n, e)
+        ParamDict(s)
+        return s
     end
 end
 
@@ -99,6 +122,8 @@ Base.getindex(s::Spectrum, a::AbstractArray) = s.procs[s.default_proc].re_ft[a]
 Base.getindex(s::Spectrum, rng::Tuple{Float64,Float64}) = s[ppmtoindex(s,rng)]
 Base.getindex(s::Spectrum, δ::Float64) = s[s.default_proc].re_ft[ppmtoindex(s, δ)]
 Base.view(s::Spectrum, v) = @view s.procs[s.default_proc][v]
+Base.size(s::Spectrum) = size(s[s.default_proc].re_ft)
+Base.abs(s::Spectrum) = abs(s[s.default_proc])
 
 function Base.getindex(s::Spectrum, param::AbstractString)
     try
@@ -114,7 +139,7 @@ Base.setindex!(s::Spectrum, d, rng::Tuple{Float64, Float64}) = (s[s.default_proc
 function Spectrum(fid :: V, acqu :: Dict{S, Any}, proc :: P) where {
     T <: AbstractFloat, V <: AbstractVector{T}, S <: AbstractString, P <: ProcessedSpectrum{T, V}
     }
-    return Spectrum(fid, acqu, Dict{Int, ProcessedSpectrum{T, V}}(1=>proc), 1, "", "")
+    s = Spectrum(fid, acqu, Dict{Int, ProcessedSpectrum{T, V}}(1=>proc), 1, "", "")
 end
 
 """
@@ -277,5 +302,59 @@ function split_fid(ser :: A) where {T, N, A <: AbstractArray{T, N}}
     end
     return ser
 end
+
+
+"""
+    ParamDict(s <: AbstractSpectrum) -> s
+- acqupars :: Dict
+- procpars :: Dict
+----------------------------------------------------------------------------------------
+For procnos, stores a copy of the acqupars so these can be referenced directly without
+knowledge of the parent procs. Note that this stores the TopSpin parameters, immutably.
+Referencing procpars at the Spectrum (expno) level references the default procpars.
+"""
+struct ParamDict{K, V} <: AbstractDict{K, V}
+    acqupars::Dict{K, V}
+    procpars::Dict{K, V}
+    # Inner constructor
+    function ParamDict(a::D, p::D) where D <: AbstractDict
+        K = keytype(D)
+        V = valtype(D)
+        return new{K, V}(a, p)
+    end
+end
+Base.getindex(d::ParamDict, key) = get(d.acqupars, key, get(d.procpars, key, throw(KeyError(key))))
+Base.haskey(d::ParamDict, key) = haskey(d.acqupars, key) || haskey(d.procpars, key)
+
+Base.iterate(d::ParamDict, state...) = iterate(merge(d.procpars, d.acqupars), state...)
+Base.length(d::ParamDict) = length(merge(d.procpars, d.acqupars))
+Base.keys(d::ParamDict) = keys(merge(d.procpars, d.acqupars))
+Base.pairs(d::ParamDict) = pairs(merge(d.procpars, d.acqupars))
+
+ParamDict(s::S) where S<:AbstractSpectrum = begin
+    for k in keys(s.procs)
+        s.procs[k].params = ParamDict(s.acqu, s.procs[k].params)
+    end
+end
+
+""" 
+    WrappedSpectrum{T, A} <: AbstractSpectrum
+    - title
+    - fid
+    - ser
+    - spectrum
+    - lb <: Function : f(t) -> f'(t)
+    - ft <: AbstractFFT : f(t) -> φ(s)
+
+"""
+mutable struct WrappedSpectrum{T <: AbstractFloat, A <: AbstractArray{T}} <: AbstractSpectrum
+    title :: S where S <: AbstractString
+    fid :: A
+    ser :: A
+    spectrum :: Spectrum
+    f :: F1 where F1 <: Function      
+end
+WrappedSpectrum(s::Spectrum) = WrappedSpectrum(s, identity)
+
 
 export Spectrum, PoptSpectrum, ProcessedSpectrum, AbstractSpectrum, size

@@ -7,7 +7,18 @@ const SFO1 = Dict{String, Float64}(
     "B11B500" => 500.1330883,
     "B10B300" => 299.9914100,
     "B10B400" => 399.9218796,
-    "B700" => 700.1343233,
+    "B21B700" => 700.1343233,
+    "MIBB800" => 800.3137619,
+    "MIBB500" => 500.01,
+)
+
+"""Dict of probe max gradient values"""
+const GMAX = Dict{String, NamedTuple}(
+    "CP-BBO-700S3" => (z = 53., x = 0., y = 0.),
+    "BBO-300" => (z = 57., x = 0., y = 0.),
+    "TBI-500" => (z = 67., x = 50., y = 50.),
+    "CP-TCI-800S4" => (z = 65.7, x = 0., y = 0.),
+
 )
 
 """
@@ -48,31 +59,32 @@ end
                     Gmax = 50, # Gauss cm-1
                     message = true)
     
-Compute the active volume from a given spectral dispersion (in ppm) with a given gradient value.
+Compute the active volume from a given spectral dispersion (in ppm) 
+with a given read gradient value.
     f(g, Δδ) -> l cm
 """
 function get_ActiveVolume(g :: T, Δδ :: T;
-                    γ = 42.577478461, # γₚ₊ / 2π, MHz T-1
+                    γ = γₚ, # γₚ₊ / 2π, MHz T-1
                     instrument = "B07B500", # default for B07
                     Gmax = 50, # Gauss cm-1
                     message = true) where T <: AbstractFloat
     !(0. ≤ g ≤ 1.) && throw(ArgumentError("Applied gradient g should be a relative value 0 ≤ g ≤ 1.")) 
     B0 = SFO1[instrument] * 1e6 # MHz => Hz
-    Δω = 1e-6 * Δδ * B0 # (Hz / Hz) * Hz => Hz
+    Δω = 1e-6 * Δδ * B0 # (Hz / ppm) * Hz => Hz
     ∂ₗ = get_ω_dispersion(g; γ = γ, Gmax = Gmax, message = false) # Hz cm-1
     l = Δω / ∂ₗ  # Hz / Hz cm-1 => cm
     ℓ = round(l, sigdigits = 3)
     message && println("\n 
     ∂/∂ₗ = $∂ₗ Hz cm-1
     len = $ℓ cm
-    Given relative gradient strength $(100*g)% and peak dispersion $Δδ ppm.
+    Given read gradient strength $(100*g)% and peak dispersion $Δδ ppm.
 
     Check that γₚ₊ and Gmax $Gmax G cm⁻¹ are appropriate.")
     return l;
 end
 
 function get_ω_dispersion(g; 
-                    γ = 42.577478461, # γₚ₊ / 2π, MHz T-1
+                    γ = γₚ, # γₚ₊ / 2π, MHz T-1
                     Gmax = 50, # Gauss cm-1
                     message = true)
     !(0. ≤ g ≤ 1.) && throw(ArgumentError("Applied gradient g should be a relative value 0 ≤ g ≤ 1.")) 
@@ -93,5 +105,29 @@ function get_ω_dispersion(g;
         return l;
     end
     
+end
+
+""" 
+    get_p2Duration(g, ΔΩ; 
+                    γ = 42.577478461, # γₚ₊ / 2π, MHz T-1
+                    Gmax = 50, # Gauss cm-1
+                    message = true)
+Needs some thought for handling different shapes. 
+    
+"""
+function get_p2Duration(g, Δω; Gmax = 60., message = true, )
+    
+
+end
+
+
+function get_grad_attenuation(g, Δt; Gmax = 60.0, message = true, γ = γₚ, instrument = "MIBB800")
+    B₀ = SFO1[instrument] * 1e6 # Hz
+    G = g*Gmax # G cm-1
+    # absolute phase change doesn't matter, but relative phase dispersion -> attenuation
+    dϕ = 1e-4 * G * γ * 1e6 # (T cm-1) (Hz T-1)  => (Hz cm-1), relative offsets
+
+
+
 end
 export get_SliceLength, get_ActiveVolume, get_ω_dispersion

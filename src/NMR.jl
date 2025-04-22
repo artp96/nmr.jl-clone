@@ -1,5 +1,8 @@
 module NMR
 
+"""γₚ, ¹H gyromagnetic ratio in MHz T⁻¹. """
+const γₚ = 42.577478461 
+
 using ProgressBars
 using DataFrames 
 using GLMakie; GLMakie.activate!()
@@ -45,6 +48,7 @@ include("decomposition.jl")
 include("integration.jl")
 include("interpolation.jl")
 # old Plots.jl functions
+# using Plots
 #include("plotting.jl")
 include("show.jl")
 
@@ -54,6 +58,7 @@ include("slice_size.jl")
 include("bruker/popt.jl")
 include("eachfibre.jl")
 include("phase_correction.jl")
+include("window_functions.jl")
 
 try
     if debug

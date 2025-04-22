@@ -18,11 +18,14 @@ function parse_or(::Type{T}, s, default::T) where T
     v === nothing ? default : v
 end
 
-const filters = [ ( Set(["SW", "O1", "SFO1", "SF", "BF1"]),
+const filters = [ ( Set(["SW", "SW_h", 
+    "O1", "O2", "O3", 
+    "SFO1", "SFO2", "SFO3", "SF", 
+    "BF1", "BF2", "BF3"]),
               s -> parse(Float64, s) ),
             ( Set(["TD", "NS", "DS", "SI"]),
               s -> parse(Int, s) ),
-            ( Set(["D", "P"]),
+            ( Set(["D", "P", "GPX", "GPY", "GPZ"]),
               parse_float_list),
             ( Set(["PULPROG"]),
               x -> strip(x)[2:end-1] ),
@@ -68,16 +71,31 @@ end
 
 function ProcessedSpectrum(path :: AbstractString, procno :: Int)
     re_ft = float(read_bruker_binary(joinpath(path, "1r")))
-    im_ft = float(read_bruker_binary(joinpath(path, "1i")))
+    # mc spectra don't have an imag part
+    im_ft = zeros(length(re_ft))
+    try
+        im_ft = float(read_bruker_binary(joinpath(path, "1i")))
+    catch e
+        @info "$path appears to be an MC or PS spectrum."
+    end
     params = read_params(joinpath(path, "proc"))
     title = read(joinpath(path, "title"), String)
     intrng = read_intrng(joinpath(path, "intrng"))
-    debug && println(intrng)
+    @debug println(intrng)
     return NMR.ProcessedSpectrum(re_ft, im_ft, params, intrng, procno, title)
 end
 
 ProcessedSpectrum(path::AbstractString) = ProcessedSpectrum(path, parse(Int, basename(path)))
 
+"""
+    Spectrum("/data/path") -> s :: {Spectrum <: AbstractSpectrum}
+----------------------------------------------------------------------------------
+Outermost constructor to import a spectrum. Prompts for a procno to set as the 
+default procno. Returns a concrete "Spectrum" container type, where aqpars and 
+procpars can be accessed using dict indexing, e.g.
+    - s["TD"] -> Number of points in the FID, an acqupar.
+    - s["LB"] -> Line broadening applied, Hz, a procpar.
+"""
 Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int) = begin
     # below, changed joinpath to omit "fid", can't find this anywhere ?
     fid = float(read_bruker_binary(joinpath(path, "fid")))
@@ -107,12 +125,41 @@ Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: 
 end
 
 Spectrum(path :: AbstractString, procno :: Int) = Spectrum(path, [procno], procno)
-function Spectrum(path :: AbstractString)
-  println.(parse.(Int, readdir(path)))
-    println("Choose a procno")
-    procno = parse.(Int, readline())
+
+
+"""
+    Spectrum("/data/path") -> s :: {Spectrum <: AbstractSpectrum}
+----------------------------------------------------------------------------------
+Outermost constructor to import a spectrum. Prompts for a procno to set as the 
+default procno. Returns a concrete "Spectrum" container type, where aqpars and 
+procpars can be accessed using dict indexing, e.g.
+    - s["TD"] -> Number of points in the FID, an acqupar.
+    - s["LB"] -> Line broadening applied, Hz, a procpar.
+"""
+function Spectrum(path :: AbstractString; interactive = true)
+    procpath = joinpath(path, "pdata")
+    if interactive
+        println.(parse.(Int, readdir(procpath)))
+        println("Choose a procno")
+        procno = parse.(Int, readline())
+    else
+        procno = parse.(Int, readdir(procpath))
+    end
     Spectrum(path,  procno)
 end
 Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Spectrum(path, procnos, minimum(procnos))
 
-export read_bruker_binary
+function multiimport(fpath) 
+    N = readdir(fpath)
+    data = Vector{Union{Missing,Spectrum}}(undef, length(N))
+    fill!(data,missing)
+    for n in N
+        try       
+            data[parse(Int,n)] = Spectrum(joinpath(fpath, n); interactive = false)
+        catch e
+            println("Could not parse expno $n:\n$e.")
+        end
+    end
+    return data = filter(!ismissing, data)
+end
+export read_bruker_binary, multiimport

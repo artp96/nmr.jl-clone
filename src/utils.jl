@@ -50,7 +50,8 @@ function ppmtohz(δ, bf, sr = 0.0)
     (bf + sr*1e-6)δ
 end
 
-"""
+
+""" 
     hztoppm(ω, bf[, sr])
 Convert relative frequency ω in Hz to chemical shift δ in ppm.
 bf in MHz and sr in Hz.
@@ -116,7 +117,7 @@ end
 union_range(s::Spectrum) = union_range([s])
 union_shifts(s::Spectrum) = union_shifts([s])
 
-freq_resolution(s::Spectrum) = s["SW"] / length(s)
+freq_resolution(s::Spectrum) = s["SW_h"] / s["TD"]
 
 title(s::Spectrum) = s[s.default_proc].title
 title(s::PoptSpectrum) = s.proc.title
@@ -160,6 +161,7 @@ end
 ### Pulse power profile
 
 """     powerprofile(pulse, dt, sfo1)
+----------------------------------------------------------------------------
 Pulse power profile for arbitrary pulse shape.
 pulse: Amplitude profile of pulse.
 dt: 'Sampling frequency' — unit of time between points in time. (s)
@@ -172,3 +174,45 @@ function powerprofile(pulse, dt, sfo1)
     max = fn[1]
     f -> fn[abs(f-sfo1)/df+1]/max
 end
+
+
+"""    hztoZe(Δω, g)
+----------------------------------------------------------------------------
+Compute the distance in cm between two frequency points in slice-selective 
+experiments, assuming applied gradient g' = g⋅Gmax is accurate / uniform.
+In practise the applied gradient is nonuniform, and so this yields distances 
+in a mixed "space-frequency" variable ζ.
+"""
+hztoζ(Δω, g) = Δω / (1e4 * g) 
+
+# some functions to extract the x-axis from a spectrum
+ppmaxis(s::S; SI = s["SI"]) where S <: AbstractSpectrum = LinRange(limits(s)..., SI)
+hzaxis(s::S; SI = s["SI"]) where S <: AbstractSpectrum = LinRange(s["O1"] - s["SW_h"] / 2, s["O1"] + s["SW_h"] / 2, SI)
+ζaxis(s::S; SI = s["SI"]) where S <: AbstractSpectrum = hztoζ.(hzaxis(s; SI = SI))
+
+#! TODO implement cmaxis. This function will require a probe-specific gradient map!
+# 
+# z(ζ) = (2π/γ) × ∫ 1/g(ζ) dζ
+
+cmaxis(s::S; SI = s["SI"]) where S <: AbstractSpectrum = @error "cmaxis() not implemented yet."
+
+"""
+    trim_spectrum(S, δ) -> (idx1, idx2)
+
+Ends of the spectrum are often distorted by DSP, and look ugly in plots or have weird phase errors.
+-   δ   a peak in ppm, if given will indices for the region δ +- 2 Hz 
+"""
+function trim_spectrum(s :: S, δ = (); pc = 0.01) where S <: AbstractSpectrum
+    # default trim, short back & sides
+    if isempty(δ)
+        n = size(s)[1]
+        idx1, idx2 = ceil(Int, pc * n), floor(Int, (1 - pc)n)
+     
+    # Otherwise phase around a specific peak.
+    else 
+        idx1 = ppmtoindex(s, δ + 3)
+        idx2 = ppmtoindex(s, δ - 3)
+    end
+    return (idx1, idx2)
+end
+export ppmaxis, hzaxis, ppmtomhz_abs, ppmtohz, ppmtoindex, hztoindex, hztoppm, hztoζ, union_range, union_shifts, limits, trim_spectrum
