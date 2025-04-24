@@ -23,7 +23,7 @@ const filters = [ ( Set(["SW", "SW_h",
     "SFO1", "SFO2", "SFO3", "SF", 
     "BF1", "BF2", "BF3"]),
               s -> parse(Float64, s) ),
-            ( Set(["TD", "NS", "DS", "SI"]),
+            ( Set(["TD", "NS", "DS", "SI", "NC", "NC_proc"]),
               s -> parse(Int, s) ),
             ( Set(["D", "P", "GPX", "GPY", "GPZ"]),
               parse_float_list),
@@ -70,15 +70,19 @@ function parse_param(param, val)
 end
 
 function ProcessedSpectrum(path :: AbstractString, procno :: Int)
-    re_ft = float(read_bruker_binary(joinpath(path, "1r")))
+    
+    params = read_params(joinpath(path, "proc"))
+    re_ft = float(read_bruker_binary(joinpath(path, "1r"))) 
+    re_ft .*= 2^params["NC_proc"]
     # mc spectra don't have an imag part
     im_ft = zeros(length(re_ft))
     try
         im_ft = float(read_bruker_binary(joinpath(path, "1i")))
+        im_ft .*= 2^params["NC_proc"]
     catch e
         @info "$path appears to be an MC or PS spectrum."
     end
-    params = read_params(joinpath(path, "proc"))
+    scale_correction = params
     title = read(joinpath(path, "title"), String)
     intrng = read_intrng(joinpath(path, "intrng"))
     @debug println(intrng)
@@ -88,7 +92,7 @@ end
 ProcessedSpectrum(path::AbstractString) = ProcessedSpectrum(path, parse(Int, basename(path)))
 
 """
-    Spectrum("/data/path") -> s :: {Spectrum <: AbstractSpectrum}
+    BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
 ----------------------------------------------------------------------------------
 Outermost constructor to import a spectrum. Prompts for a procno to set as the 
 default procno. Returns a concrete "Spectrum" container type, where aqpars and 
@@ -96,11 +100,11 @@ procpars can be accessed using dict indexing, e.g.
     - s["TD"] -> Number of points in the FID, an acqupar.
     - s["LB"] -> Line broadening applied, Hz, a procpar.
 """
-Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int) = begin
+BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int) = begin
     # below, changed joinpath to omit "fid", can't find this anywhere ?
-    fid = float(read_bruker_binary(joinpath(path, "fid")))
     # fid = float(read_bruker_binary(path))
     acqu = read_params(joinpath(path, "acqu"))
+    fid = float(read_bruker_binary(joinpath(path, "fid"))) .* 2^acqu["NC"]
     name = basename(dirname(path))
     expno = basename(path) 
 
@@ -121,14 +125,14 @@ Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: 
         proc_path = joinpath(path, "pdata", string(procno))
         procs[procno] = ProcessedSpectrum(proc_path, procno)
     end
-    Spectrum(fid, acqu, procs, default_proc, name, expno)
+    BrukerSpectrum(fid, acqu, procs, default_proc, name, expno)
 end
 
-Spectrum(path :: AbstractString, procno :: Int) = Spectrum(path, [procno], procno)
+BrukerSpectrum(path :: AbstractString, procno :: Int) = BrukerSpectrum(path, [procno], procno)
 
 
 """
-    Spectrum("/data/path") -> s :: {Spectrum <: AbstractSpectrum}
+    BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
 ----------------------------------------------------------------------------------
 Outermost constructor to import a spectrum. Prompts for a procno to set as the 
 default procno. Returns a concrete "Spectrum" container type, where aqpars and 
@@ -136,7 +140,7 @@ procpars can be accessed using dict indexing, e.g.
     - s["TD"] -> Number of points in the FID, an acqupar.
     - s["LB"] -> Line broadening applied, Hz, a procpar.
 """
-function Spectrum(path :: AbstractString; interactive = true)
+function BrukerSpectrum(path :: AbstractString; interactive = true)
     procpath = joinpath(path, "pdata")
     if interactive
         println.(parse.(Int, readdir(procpath)))
@@ -145,21 +149,22 @@ function Spectrum(path :: AbstractString; interactive = true)
     else
         procno = parse.(Int, readdir(procpath))
     end
-    Spectrum(path,  procno)
+    BrukerSpectrum(path,  procno)
 end
-Spectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = Spectrum(path, procnos, minimum(procnos))
+BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = BrukerSpectrum(path, procnos, minimum(procnos))
 
 function multiimport(fpath) 
     N = readdir(fpath)
-    data = Vector{Union{Missing,Spectrum}}(undef, length(N))
+    data = Vector{Union{Missing,BrukerSpectrum}}(undef, length(N))
     fill!(data,missing)
     for n in N
         try       
-            data[parse(Int,n)] = Spectrum(joinpath(fpath, n); interactive = false)
+            data[parse(Int,n)] = BrukerSpectrum(joinpath(fpath, n); interactive = false)
         catch e
             println("Could not parse expno $n:\n$e.")
         end
     end
-    return data = filter(!ismissing, data)
+    # ensures element type stability
+    return skipmissing(data) |> collect
 end
 export read_bruker_binary, multiimport

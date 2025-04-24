@@ -1,5 +1,5 @@
 
-function plot_limits(s::NMR.Spectrum, margin = 0.1)
+function plot_limits(s::NMR.BrukerSpectrum, margin = 0.1)
     m, M = (minimum(minimum(d) for d in intrng_data(s)),
             maximum(maximum(d) for d in intrng_data(s)))
     Δ = M - m
@@ -12,7 +12,7 @@ function plot_limits(a::AbstractArray, margin = 0.1)
     (m - margin*Δ, M + margin * Δ)
 end
 
-@recipe function f(s::Union{Spectrum, AbstractArray{Spectrum}};
+@recipe function f(s::Union{BrukerSpectrum, AbstractArray{BrukerSpectrum}};
                    integrate=false, Δ=union_range(s), npoints=0)
     isarray = isa(s, AbstractArray)
     ss = isarray ? s : [s]
@@ -52,7 +52,7 @@ function integral_curve(a::AbstractArray{T,1}, scale::Float64; shift=0.0) where 
     return x
 end
 
-function integral_curve(s::Spectrum, Δ=limits(s))
+function integral_curve(s::BrukerSpectrum, Δ=limits(s))
     ints = integrate(s)
     if length(ints)==0
         return

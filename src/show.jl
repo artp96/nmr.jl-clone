@@ -1,5 +1,5 @@
 
-function show(io::IO, s::Spectrum)
+function show(io::IO, s::BrukerSpectrum)
     println(io, "==== $(s.name) ($(s.expno)) ====")
     println(io, "FID size: $(length(s.fid))")
     println(io, "# processings: $(length(s.procs))") 

@@ -14,7 +14,7 @@ Processed (frequency domain) NMR spectrum. Parameters follow the Bruker conventi
 - **im_ft**: imaginary part of Fourier transform
 - **params**: dictionary of processing parameters, mostly from `proc` file for Bruker data
 - **intrng**: list of integration ranges
-- **title**: Spectrum title
+- **title**: BrukerSpectrum title
 """
 mutable struct ProcessedSpectrum{T <: AbstractFloat, V <: AbstractVector{T}, S <: String} <: AbstractSpectrum
     re_ft :: V
@@ -69,10 +69,11 @@ Base.getindex(p::ProcessedSpectrum, a::AbstractArray) = p.re_ft[a]
 Base.view(p::ProcessedSpectrum, v) = @view p.re_ft[v]
 Base.abs(p::ProcessedSpectrum) = abs.(complex(p))
 
-#Functional shorthand into procno spectra
+# Functional shorthand into procno spectra
+# may need correction for baseline in every case for Procnos?
 import Base.complex, Base.imag, Base.real
-Base.real(p::P) where P<:ProcessedSpectrum = p.re_ft
-Base.imag(p::P) where P<:ProcessedSpectrum = im * p.im_ft
+Base.real(p::P) where P<:ProcessedSpectrum = p.re_ft #./ p.re_ft[1]
+Base.imag(p::P) where P<:ProcessedSpectrum = im * p.im_ft #./ p.im_ft[1]
 Base.complex(p::P) where P<:ProcessedSpectrum = p.re_ft .+ im * p.im_ft
 
 Base.size(p :: P) where P <: ProcessedSpectrum = size(p.re_ft)
@@ -87,7 +88,7 @@ Following Bruker convention:
 - **name**: Experiment name
 - **expno**: Experiment number if, e.g., part of a Bruker dataset
 """
-mutable struct Spectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, P <: ProcessedSpectrum{T}}  <: AbstractSpectrum
+mutable struct BrukerSpectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, P <: ProcessedSpectrum{T}}  <: AbstractSpectrum
     fid :: V
     acqu :: Dict{String, Any}
     procs :: Dict{Int, P}
@@ -96,7 +97,7 @@ mutable struct Spectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, 
     expno :: Int
         
     # Inner constructor to handle weakly typed dicts & split the FID.
-    function Spectrum(f :: V, a :: Dict{S, Any}, p :: Dict{I, P}, d :: I, n :: String, e :: I) where {
+    function BrukerSpectrum(f :: V, a :: Dict{S, Any}, p :: Dict{I, P}, d :: I, n :: String, e :: I) where {
         # Type-fu is intensifying #
         T <: AbstractFloat, 
         V <: AbstractVector{T}, 
@@ -116,30 +117,30 @@ mutable struct Spectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, 
     end
 end
 
-Base.getindex(s::Spectrum, i::Int) = s.procs[i]
-Base.getindex(s::Spectrum, ::Colon) = s.procs[s.default_proc].re_ft
-Base.getindex(s::Spectrum, a::AbstractArray) = s.procs[s.default_proc].re_ft[a]
-Base.getindex(s::Spectrum, rng::Tuple{Float64,Float64}) = s[ppmtoindex(s,rng)]
-Base.getindex(s::Spectrum, δ::Float64) = s[s.default_proc].re_ft[ppmtoindex(s, δ)]
-Base.view(s::Spectrum, v) = @view s.procs[s.default_proc][v]
-Base.size(s::Spectrum) = size(s[s.default_proc].re_ft)
-Base.abs(s::Spectrum) = abs(s[s.default_proc])
+Base.getindex(s::BrukerSpectrum, i::Int) = s.procs[i]
+Base.getindex(s::BrukerSpectrum, ::Colon) = s.procs[s.default_proc].re_ft
+Base.getindex(s::BrukerSpectrum, a::AbstractArray) = s.procs[s.default_proc].re_ft[a]
+Base.getindex(s::BrukerSpectrum, rng::Tuple{Float64,Float64}) = s[ppmtoindex(s,rng)]
+Base.getindex(s::BrukerSpectrum, δ::Float64) = s[s.default_proc].re_ft[ppmtoindex(s, δ)]
+Base.view(s::BrukerSpectrum, v) = @view s.procs[s.default_proc][v]
+Base.size(s::BrukerSpectrum) = size(s[s.default_proc].re_ft)
+Base.abs(s::BrukerSpectrum) = abs(s[s.default_proc])
 
-function Base.getindex(s::Spectrum, param::AbstractString)
+function Base.getindex(s::BrukerSpectrum, param::AbstractString)
     try
         s.acqu[param]
     catch err
         s[s.default_proc][param]
     end
 end
-Base.setindex!(s::Spectrum, d::AbstractArray, ::Colon) = (s[s.default_proc].re_ft .= d)
-Base.setindex!(s::Spectrum, d::AbstractArray, r::UnitRange) = (s[s.default_proc].re_ft[r] .= d)
-Base.setindex!(s::Spectrum, d, rng::Tuple{Float64, Float64}) = (s[s.default_proc].re_ft[ppmtoindex(s,rng)]=d)
+Base.setindex!(s::BrukerSpectrum, d::AbstractArray, ::Colon) = (s[s.default_proc].re_ft .= d)
+Base.setindex!(s::BrukerSpectrum, d::AbstractArray, r::UnitRange) = (s[s.default_proc].re_ft[r] .= d)
+Base.setindex!(s::BrukerSpectrum, d, rng::Tuple{Float64, Float64}) = (s[s.default_proc].re_ft[ppmtoindex(s,rng)]=d)
 
-function Spectrum(fid :: V, acqu :: Dict{S, Any}, proc :: P) where {
+function BrukerSpectrum(fid :: V, acqu :: Dict{S, Any}, proc :: P) where {
     T <: AbstractFloat, V <: AbstractVector{T}, S <: AbstractString, P <: ProcessedSpectrum{T, V}
     }
-    s = Spectrum(fid, acqu, Dict{Int, ProcessedSpectrum{T, V}}(1=>proc), 1, "", "")
+    s = BrukerSpectrum(fid, acqu, Dict{Int, ProcessedSpectrum{T, V}}(1=>proc), 1, "", "")
 end
 
 """
@@ -311,7 +312,7 @@ end
 ----------------------------------------------------------------------------------------
 For procnos, stores a copy of the acqupars so these can be referenced directly without
 knowledge of the parent procs. Note that this stores the TopSpin parameters, immutably.
-Referencing procpars at the Spectrum (expno) level references the default procpars.
+Referencing procpars at the BrukerSpectrum (expno) level references the default procpars.
 """
 struct ParamDict{K, V} <: AbstractDict{K, V}
     acqupars::Dict{K, V}
@@ -351,10 +352,10 @@ mutable struct WrappedSpectrum{T <: AbstractFloat, A <: AbstractArray{T}} <: Abs
     title :: S where S <: AbstractString
     fid :: A
     ser :: A
-    spectrum :: Spectrum
+    spectrum :: BrukerSpectrum
     f :: F1 where F1 <: Function      
 end
-WrappedSpectrum(s::Spectrum) = WrappedSpectrum(s, identity)
+WrappedSpectrum(s::BrukerSpectrum) = WrappedSpectrum(s, identity)
 
 
-export Spectrum, PoptSpectrum, ProcessedSpectrum, AbstractSpectrum, size
+export BrukerSpectrum, PoptSpectrum, ProcessedSpectrum, AbstractSpectrum, size

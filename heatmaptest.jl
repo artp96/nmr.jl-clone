@@ -13,12 +13,12 @@ expno = "7"
 #spath  = joinpath(homedir(), "nmrdata/data/2025/b500b07/250326")
 #expno = "9"
 
-#!TODO:  NMR.Spectrum does not work without 1i/1r for now 130325. Need to test on a zg spectrum. 
+#!TODO:  NMR.BrukerSpectrum does not work without 1i/1r for now 130325. Need to test on a zg spectrum. 
 
-#!TODO:  NMR.Spectrum does not work without 1i/1r for now 130325. Need to test on a zg spectrum. 
+#!TODO:  NMR.BrukerSpectrum does not work without 1i/1r for now 130325. Need to test on a zg spectrum. 
 # Need to test on a zg spectrum
 
-s = Spectrum(joinpath(spath, expno), [1], 1)
+s =  BrukerSpectrum(joinpath(spath, expno), [1], 1)
 
 poptpath = joinpath(spath, expno)
 protpath = joinpath(poptpath, "popt.protocol.999")

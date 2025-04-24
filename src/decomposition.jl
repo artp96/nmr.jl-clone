@@ -53,12 +53,12 @@ function alignments(signal, chunk, start_pos; tol=250, fuzziness=1.5,
     end
 end
 
-alignments(s::Spectrum, args...; kw...) = alignments(s[:],args...;kw...)
-alignments(s::Spectrum, l::Spectrum, args...; kw...) =
+alignments(s::BrukerSpectrum, args...; kw...) = alignments(s[:],args...;kw...)
+alignments(s::BrukerSpectrum, l::BrukerSpectrum, args...; kw...) =
     Array{Tuple{Int64,Float64},1}[ alignments(s[:], l[r], r.start, args...; kw...) for r in intrng_indices(l) ]
 
-guesses(s::Spectrum, l::Spectrum; kw...) = vec(collect(Base.product(alignments(s, l; kw...)...)))
-function guesses_adaptive(s::Spectrum, l::Spectrum;
+guesses(s::BrukerSpectrum, l::BrukerSpectrum; kw...) = vec(collect(Base.product(alignments(s, l; kw...)...)))
+function guesses_adaptive(s::BrukerSpectrum, l::BrukerSpectrum;
                           ntarget=TARGETNGUESS, δ=ntarget/4, kw...)
     fuzz = (MAXFUZZ + MINFUZZ) / 2
     @binary_opt ( *(length.(alignments(s, l; fuzziness=fuzz, kw...))...) - ntarget ) fuzz MINFUZZ MAXFUZZ δ
@@ -88,17 +88,17 @@ function projection_weights(projs, fitness_weights=ones(length(projs)), η=2.0)
     exp.(-(projs.-m).^2/2σ^2)
 end
 
-function projections(s::Spectrum, l::Spectrum, positions)
+function projections(s::BrukerSpectrum, l::BrukerSpectrum, positions)
     sig = s[:]
     Float64[ projection(sig, r, p) for (p,r) in zip(positions, intrng_data(l)) ]
 end
 
-# function projection(s::Spectrum, l::Spectrum, positions, weights=ones(positions))
+# function projection(s::BrukerSpectrum, l::BrukerSpectrum, positions, weights=ones(positions))
 #     projs = projections(s, l, positions)
 #     mean(projs, StatsBase.weights(weights))
 # end
 
-function projection(s::Spectrum, l::Spectrum, guess::NTuple{N,Tuple{Int64,Float64}}) where N
+function projection(s::BrukerSpectrum, l::BrukerSpectrum, guess::NTuple{N,Tuple{Int64,Float64}}) where N
     projs = projections(s, l, positions(guess))
     if length(projs) == 1
         return first(projs)
@@ -109,12 +109,12 @@ function projection(s::Spectrum, l::Spectrum, guess::NTuple{N,Tuple{Int64,Float6
     # projection(s, l, positions(guess), Float64[f(ff) for ff in fitness(guess)])
 end
 
-function projection_score(s::Spectrum, l::Spectrum, guess::NTuple{N,Tuple{Int64,Float64}}) where N
+function projection_score(s::BrukerSpectrum, l::BrukerSpectrum, guess::NTuple{N,Tuple{Int64,Float64}}) where N
     projs = projections(s, l, positions(guess))
     mean(projs)/std(projs, StatsBase.weights(fitness(guess)); corrected = false)
 end
 
-function fit_score(s::Spectrum, l::Spectrum, guess::NTuple{N,Tuple{Int64,Float64}}) where N
+function fit_score(s::BrukerSpectrum, l::BrukerSpectrum, guess::NTuple{N,Tuple{Int64,Float64}}) where N
     if N == 0
         0.0
     else
@@ -125,16 +125,16 @@ end
 # overall score, not comparable between references
 score(s, l, g) = fit_score(s, l, g) * projection_score(s, l, g)
 
-synthesize(l::Spectrum, positions) =
+synthesize(l::BrukerSpectrum, positions) =
     overlay!(zeros(length(l)), intrng_data(l), positions)
-synthesize(l::Spectrum, guess::Guess{N}) where N =
+synthesize(l::BrukerSpectrum, guess::Guess{N}) where N =
     synthesize(l, positions(guess))
 
-# function score(s::Spectrum, l::Spectrum, guess::AbstractArray{Tuple{Int,Float64}})
+# function score(s::BrukerSpectrum, l::BrukerSpectrum, guess::AbstractArray{Tuple{Int,Float64}})
 #     *((g[2] for g in guess)...)
 # end
 
-function aligned_signals(s::Spectrum, l::Spectrum; sloppiness=0, kw...)
+function aligned_signals(s::BrukerSpectrum, l::BrukerSpectrum; sloppiness=0, kw...)
     positions = alignments(s, l; kw...)
     matched = filter(p->!isempty(p), positions)
     if length(matched) == 0 ||  length(positions) - length(matched) > sloppiness
@@ -152,7 +152,7 @@ struct DecompositionResult
     matrix :: Matrix{Float64}
 end
 
-function lsq_analyze(s::Spectrum, lib::AbstractArray{Spectrum}, found; kw...)
+function lsq_analyze(s::BrukerSpectrum, lib::AbstractArray{BrukerSpectrum}, found; kw...)
     ll = length(lib)
     gs = Array{Any}(undef, ll)
     fit_scores = Array{Array{Float64,1}}(undef, ll)
@@ -179,7 +179,7 @@ function lsq_analyze(s::Spectrum, lib::AbstractArray{Spectrum}, found; kw...)
     ss, max_ref, maxguess, p, l
 end
 
-function lsq_analyze(s::Spectrum, lib::AbstractArray{Spectrum};
+function lsq_analyze(s::BrukerSpectrum, lib::AbstractArray{BrukerSpectrum};
                      callback = refs -> println("Found: #$refs"), kw...)
     found = Int64[]
     coeffs = Float64[]

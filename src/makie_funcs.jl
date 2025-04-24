@@ -146,7 +146,8 @@ splatted_heatmaps(df::D; kwargs...) where D<:AbstractDataFrame = splatted_heatma
 
 import GLMakie: lines
 # some quick wrappers for lines
-lines(s::Spectrum, kind = real, p = s.default_proc, kwargs...) = lines(s[p], kind; kwargs...)
+lines(s::BrukerSpectrum, kind = real, p = s.default_proc, kwargs...) = lines(s[p], kind; kwargs...)
+
 const LINESTYLES = [:solid, :dash,:solid, :dash, :solid, :dash,:solid, :dash]
 
 function lines(p::P, kind::Function = real; colormap = :plasma, title = p.title, idxs = missing, axis_func = ppmaxis, kwargs... ) where P<:ProcessedSpectrum
@@ -193,11 +194,20 @@ end
 
 
 # some lines methods for multi-plotting
-lines(v::V, kind::Function=real; kwargs...) where V<:Vector{<:Spectrum} = lines([s[s.default_proc] for s ∈ v], kind; kwargs...)
+lines(v::V, kind::Function=real; labels = [s.expno for s in v], kwargs...) where V<:Vector{<:BrukerSpectrum} = lines([s[s.default_proc] for s ∈ v], kind; labels, kwargs...)
 
 
-function lines(V::P, kind::Function = real; colormap = :plasma, title = "No Title", idxs = missing, axis_func = ppmaxis, labels = missing, kwargs... ) where P<:Vector{<:ProcessedSpectrum}
+function lines(V::P, kind::Function = real;
+               colormap = :plasma,
+               title = "No Title",
+               idxs = missing, 
+               axis_func = ppmaxis, 
+               labels = Vector{String}(), 
+               legtitle = "", 
+               preproc::Function = identity, 
+               kwargs... ) where P<:Vector{<:ProcessedSpectrum}
 
+    labels = string.(labels)
     @assert in(kind, [real, imag, complex, abs]) "'kind = f::Function' arg must refer to one of 'real', 'imag', 'abs' or 'complex'."
     @assert in(axis_func, [ppmaxis, hzaxis, ζaxis, cmaxis]) "'axis_func = f::Function kwarg must refer to one of 'ppmaxis', hzaxis', 'ζaxis' or 'cmaxis'."
     
@@ -205,13 +215,12 @@ function lines(V::P, kind::Function = real; colormap = :plasma, title = "No Titl
     max, pno = findmax([size(v) for v ∈ V])
 
     p = V[pno]
+    idx1, idx2 = trim_spectrum(p)
     if !ismissing(idxs) 
         @info "Passed indices to lines() plot are expected to be a tuple in idxs = (ppm, ppm) format."
         idx1, idx2 = ppmtoindex(p, idxs[1]), ppmtoindex(p, idxs[2]) 
         # no reason not to fix this here.
         idx1, idx2 = idx1 > idx2 ? (idx2, idx1) : (idx1, idx2)
-    else
-        idx1, idx2 = trim_spectrum(p)
     end
     xaxis = axis_func(p)[idx1:idx2] 
     xticks = round.([getindex(xaxis, i) for i ∈ round.(Int, LinRange(1, idx2-idx1, 10) )]; digits = 3)
@@ -223,19 +232,19 @@ function lines(V::P, kind::Function = real; colormap = :plasma, title = "No Titl
 
     for (i, p) in enumerate(V)
 
+        idx1, idx2 = trim_spectrum(p)
         if !ismissing(idxs) 
             idx1, idx2 = ppmtoindex(p, idxs[1]), ppmtoindex(p, idxs[2]) 
             # no reason not to fix this here.
             idx1, idx2 = idx1 > idx2 ? (idx2, idx1) : (idx1, idx2)
-        else
-            idx1, idx2 = trim_spectrum(p)
         end
 
         xaxis = axis_func(p)[idx1:idx2] 
 
         # complex mode needs a bit more setup
         if (kind != complex)
-            signal = @view kind(p)[idx1:idx2]
+            preprocessed = preproc(kind(p))
+            signal = @view preprocessed[idx1:idx2]
         else
             re = @view real(p)[idx1:idx2]
             im = @view imag(p)[idx1:idx2]
@@ -243,10 +252,12 @@ function lines(V::P, kind::Function = real; colormap = :plasma, title = "No Titl
         end
      
         for sig in eachcol(signal)
+            
             iter = sig.indices[2]
             lines!(ax, xaxis, sig,
                 colormap = colormap,
                 linestyle = LINESTYLES[iter],
+                linewidth = 1,
                 label = labels[i]
                )
         end
@@ -256,9 +267,8 @@ function lines(V::P, kind::Function = real; colormap = :plasma, title = "No Titl
     ax.xticklabelsize = 14
     ax.xticklabelalign = (:left, :center)
 
-    if labels != false
-        axislegend(ax)
-    end
+    fig[1,2] = Legend(fig, ax, legtitle, framevisible = false)
+
 
     resize_to_layout!(fig)
     return fig

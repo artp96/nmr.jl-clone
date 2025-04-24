@@ -8,7 +8,7 @@ function show(io::IO, intrng::Array{Intrng,1})
     end
 end
 
-function dump(path, s::Spectrum)
+function dump(path, s::BrukerSpectrum)
     if !isdir(path)
         mkdir(path)
 end
@@ -24,7 +24,7 @@ end
     # TODO: Save acqu/acqus
 end
 
-function dump(path, s::Spectrum, templatepath)
+function dump(path, s::BrukerSpectrum, templatepath)
     cp(templatepath, path)
     dump(path, s)
 end

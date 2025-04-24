@@ -2,7 +2,7 @@
 # NMR quantities in Bruker notation [1]:
 # BF1: Basic transmitter frequency (MHz)
 # SF: Spectrometer frequency (MHz)
-# SR: Spectrum reference frequency (Hz)
+# SR: BrukerSpectrum reference frequency (Hz)
 # SR = (SF - BF1) * 10^6
 # SFO1: Transmitter frequency (MHz)
 # O1: Transmitter frequency offset (Hz)
@@ -101,31 +101,31 @@ hztoindex(s :: S, f) where S <: AbstractSpectrum = hztoindex(f, s["SW"], s["SF"]
 
 Base.length(s :: S) where S <: AbstractSpectrum = length(s[:])
 
-function union_range(ss::AbstractArray{Spectrum})
+function union_range(ss::AbstractArray{BrukerSpectrum})
     lims = [limits(s) for s in ss]
     l = minimum(lim[1] for lim in lims)
     h = maximum(lim[2] for lim in lims)
     h,l
 end
 
-function union_shifts(ss::AbstractArray{Spectrum})
+function union_shifts(ss::AbstractArray{BrukerSpectrum})
     h,l = union_range(ss)
     res = minimum(freq_resolution(s) for s in ss)
     h:-res:l
 end
 
-union_range(s::Spectrum) = union_range([s])
-union_shifts(s::Spectrum) = union_shifts([s])
+union_range(s::BrukerSpectrum) = union_range([s])
+union_shifts(s::BrukerSpectrum) = union_shifts([s])
 
-freq_resolution(s::Spectrum) = s["SW_h"] / s["TD"]
+freq_resolution(s::BrukerSpectrum) = s["SW_h"] / s["TD"]
 
-title(s::Spectrum) = s[s.default_proc].title
+title(s::BrukerSpectrum) = s[s.default_proc].title
 title(s::PoptSpectrum) = s.proc.title
 
 # Returns a copy of s with all but the given
 # ranges zeroed out. The default proc for s will
 # have its intrng adjusted to Δs as well.
-function extract(s::Spectrum, Δs::AbstractArray{Intrng})
+function extract(s::BrukerSpectrum, Δs::AbstractArray{Intrng})
     res = deepcopy(s)
     res[res.default_proc].re_ft = zeros(length(s))
     res[res.default_proc].im_ft = zeros(length(s))
@@ -138,7 +138,7 @@ function extract(s::Spectrum, Δs::AbstractArray{Intrng})
     res
 end
 
-extract(s::Spectrum, Δ::Intrng) = extract(s, [Δ])
+extract(s::BrukerSpectrum, Δ::Intrng) = extract(s, [Δ])
 
 """Tunes `param` until `expr` evaluates to zero within δ.
 `expr` must be monotonically increasing in terms of `param`."""

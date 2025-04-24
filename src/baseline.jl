@@ -6,8 +6,10 @@ average intensity of a region.
     - S <: AbstractSpectrum
     - Δppm::Tuple{Float64,Float64} - should be a region of 𝑛𝑜𝑖𝑠𝑒.
 """
-function baseline_correct!(s::S, ppm_range::Tuple{Float64,Float64}) where S <: Spectrum
-    s[:] .-= mean(s[ppm_range])
+function baseline_correct!(s::S, ppm_range::Tuple) where S <: BrukerSpectrum
+    ppm_range = float(ppm_range)
+    idx1,idx2 = ppmtoindex.(ppm_range)
+    s[:] .-= mean(s[idx1:idx2])
     s
 end
 

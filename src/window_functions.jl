@@ -12,7 +12,7 @@ Apply a gaussian broadening function. The true start of acquisition
 """
 function exp_window(s :: S, b) where S <: AbstractSpectrum
     b = float(b)
-    
+    dt = s["AQ"] / s["TD"]
     
 end
 

@@ -68,7 +68,7 @@ catch
     global debug = false
 end
 
-export Spectrum, ProcessedSpectrum, dump, # constructors, I/O
+export BrukerSpectrum, ProcessedSpectrum, dump, # constructors, I/O
        plot, plot!, # plotting
        lsq_analyze, candidates, decompose, # decomposition
        ppmtoindex, hztoindex, ppmtohz, # unit conversion

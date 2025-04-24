@@ -8,7 +8,7 @@ dataset_path = joinpath(@__DIR__, "data", "PhB(OH)2", "1")
 
 # write your own tests here
 @testset "Read Bruker" begin
-    s = Spectrum(dataset_path, 1)
+    s = BrukerSpectrum(dataset_path, 1)
     @test s.default_proc == 1
     @test length(s) == length(s[1])  == s["SI"] == 32768
     @test s["TD"] == 18486
@@ -20,7 +20,7 @@ dataset_path = joinpath(@__DIR__, "data", "PhB(OH)2", "1")
 end
 
 @testset "Unit conversions" begin
-    s = Spectrum(dataset_path, 1)
+    s = BrukerSpectrum(dataset_path, 1)
     sf = s["SF"]
     bf = s["BF1"]
     @test NMR.sr(sf, bf) ≈ 0.0

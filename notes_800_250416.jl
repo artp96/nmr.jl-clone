@@ -1,8 +1,14 @@
-using NMR
+# module imports
+using NMR, GLMakie, CairoMakie
+GLMakie.activate!()
 import NMR: SFO1, GMAX
+
 const dpath = joinpath(homedir(), "nmrdata/data/2025/b800mib/20250417")
 
+data = multiimport(dpath); expnos = [d.expno for d in data]
+S = (; (Symbol(expnos) .=> data)... )
 G = GMAX["CP-TCI-800S4"].z
+
 # ∂Hz / ∂ cm for read and selection gradients
 gpz1_Hz = get_ω_dispersion(0.01  ; Gmax = G, message = false);
 gpz5_Hz = get_ω_dispersion(0.05  ; Gmax = G, message = false);
@@ -22,22 +28,19 @@ zgr_vol = get_ActiveVolume(0.2, 7.85; instrument = "MIBB800", Gmax = G, message 
 kHz_bws = NamedTuple( Symbol.(kHz_bandwidth) .=> get_ActiveVolume.(0.01, Δδ; instrument = "MIBB800", Gmax = G, message = false) )
 slice_w = get_SliceLength.([0.05, 0.1, 0.2], 17.2e3; Gmax = G);
 
-data = multiimport(dpath)
+
 # product of gaussian signal profile with bandwidth w centred at spoffs s₀, 
 # a linear gradient signal profile, and a d²g/dz² term
 #profile(w, s, s₀ = 0.,) = exp(-( (s-s0)/2.355w )^2 ) * ( (s - s₀) + (s^3 - s₀) )
 
 """ freq_profile(s, g)
-    - s <: Spectrum
+    - s <:  BrukerSpectrum
     - g - applied gradient, default "GPZ9" * GMAX
 --------------------------------------------------------------------
 """
 function freq_profile(s, g)
     s_ζ = real(s)    
     
-
-    
-
 end
 
 
@@ -58,5 +61,21 @@ function tau_to_p(gₛ, gᵣ, d32, p2, s)
     return (gₛ / gᵣ)
 end
 # calculating this for our 153 Hz modulation:
-tau_to_p(20, 1, 350e-6, 51e-6, 153) # ≈ 2.2
+tau_to_p(20, 1, 300e-6, 51e-6, 153) # ≈ 2.2
+#some common plot paramaters
+idxs = (-2.659,12.659)
+figdir = joinpath(homedir(), "noteforGAM0425", "figures")
+# first figure, spectra need reordering
+title = "dB Calibration with no selection gradient, 1 % read."
+legend = [-6, -7, -8, -9, -10, -11, -11.4]; legtitle = "p2 dB"
+plt2data = append!(reverse(data[18:20]), data[21:24])
+plot1 = lines(plt2data, labels = legend, idxs = idxs, title = title, legtitle = legtitle)
+save(joinpath(figdir, "no_selection_powercal.pdf"), plot1; backend = CairoMakie)
 
+
+# second figure, with read gradient, small slice, good control?
+title = "dB Calibration with 20% selection (3 mm slice), 1 % read."
+legend = [-6, -7, -8, -9, -10, -11]; legtitle = "p2 dB"
+nums = 27:32
+plot1 = lines(data[nums], labels = legend, idxs = idxs, title = title, legtitle = legtitle)
+save(joinpath(figdir, "17kHz20pc_powercal.pdf"), plot1; backend = CairoMakie)
