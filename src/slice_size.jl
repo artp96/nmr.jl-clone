@@ -130,4 +130,4 @@ function get_grad_attenuation(g, Δt; Gmax = 60.0, message = true, γ = γₚ, i
 
 
 end
-export get_SliceLength, get_ActiveVolume, get_ω_dispersion
+export get_SliceLength, get_ActiveVolume, get_ω_dispersion, GMAX, SFO1

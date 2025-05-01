@@ -18,7 +18,7 @@ expno = "7"
 #!TODO:  NMR.BrukerSpectrum does not work without 1i/1r for now 130325. Need to test on a zg spectrum. 
 # Need to test on a zg spectrum
 
-s =  BrukerSpectrum(joinpath(spath, expno), [1], 1)
+s = BrukerSpectrum(joinpath(spath, expno), [1], 1)
 
 poptpath = joinpath(spath, expno)
 protpath = joinpath(poptpath, "popt.protocol.999")

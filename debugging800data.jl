@@ -10,19 +10,20 @@ expnos = [d.expno for d in data]
 S = (; (Symbol(expnos) .=> data)... )
 
 # a function to find the differences between all the stored metadata of two spectra
-function getdiffs(s1::S, s2::S) where S <: AbstractSpectrum
+function getdiffs(s1::D, s2::D) where D <: AbstractDict
     acqudiffs = Vector{Any}[]
-        for key in keys(s1.acqu)
-           if all(s1.acqu[key] .== s2.acqu[key])
+    for key in keys(merge(s1, s2))
+           if all(s1[key] .== s2[key])
            #println("$key : ok!")
            else
-           println("$key : $(s1.acqu[key]) \n ≠ \n $(s2.acqu[key])")
+            println("$key : $(acqu[key][1:30]) \n ≠ \n $(acqu[key][1:30])")
             push!(acqudiffs, [key])
        end
     end
 
     return acqudiffs
 end
+getdiffs(s1::S, s2::S) where S <: AbstractSpectrum = getdiffs(s1.acqu, s2.acqu)
 
 s30, s31 = data[30:31]
 

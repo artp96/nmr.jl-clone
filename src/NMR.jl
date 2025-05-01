@@ -13,7 +13,6 @@ using Statistics
 using RecipesBase
 using FFTW
 using FastTransforms
-
 using CUDA
 if has_cuda() & has_cuda_gpu()
     @info "CUDA found. GPU mode."

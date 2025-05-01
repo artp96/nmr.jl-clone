@@ -21,9 +21,11 @@ end
 const filters = [ ( Set(["SW", "SW_h", 
     "O1", "O2", "O3", 
     "SFO1", "SFO2", "SFO3", "SF", 
-    "BF1", "BF2", "BF3"]),
+    "BF1", "BF2", "BF3", 
+    # GRPDLY / DSP Variables.
+    "GRPDLY", "DSPFVS", "DECIM"]),
               s -> parse(Float64, s) ),
-            ( Set(["TD", "NS", "DS", "SI", "NC", "NC_proc"]),
+            ( Set(["TD","TD0", "NS", "DS", "SI", "NC", "NC_proc"]),
               s -> parse(Int, s) ),
             ( Set(["D", "P", "GPX", "GPY", "GPZ"]),
               parse_float_list),
@@ -72,27 +74,33 @@ end
 function ProcessedSpectrum(path :: AbstractString, procno :: Int)
     
     params = read_params(joinpath(path, "proc"))
-    re_ft = float(read_bruker_binary(joinpath(path, "1r"))) 
-    re_ft .*= 2^params["NC_proc"]
-    # mc spectra don't have an imag part
-    im_ft = zeros(length(re_ft))
-    try
-        im_ft = float(read_bruker_binary(joinpath(path, "1i")))
-        im_ft .*= 2^params["NC_proc"]
+    
+    if "1r" in readdir(path)
+        (r,i) = ("1r", "1i")
+    elseif "2rr" in readdir(path)
+        (r,i) = ("2rr", "2ii")
+    else
+        @error "No 1r or 2rr file found for $procno \n (at $path)."
+    end
+        re_ft = read_bruker_binary(joinpath(path, r)) .* 2^params["NC_proc"]
+
+    im_ft = zeros(size(re_ft))
+    try 
+        im_ft = read_bruker_binary(joinpath(path, i)) .* 2^params["NC_proc"]
     catch e
-        @info "$path appears to be an MC or PS spectrum."
+        @info "$path has no imaginary part."
     end
     scale_correction = params
     title = read(joinpath(path, "title"), String)
     intrng = read_intrng(joinpath(path, "intrng"))
     @debug println(intrng)
-    return NMR.ProcessedSpectrum(re_ft, im_ft, params, intrng, procno, title)
+    return NMR.ProcessedSpectrum(float(re_ft), float(im_ft), params, intrng, procno, title)
 end
 
 ProcessedSpectrum(path::AbstractString) = ProcessedSpectrum(path, parse(Int, basename(path)))
 
 """
-    BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
+   BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
 ----------------------------------------------------------------------------------
 Outermost constructor to import a spectrum. Prompts for a procno to set as the 
 default procno. Returns a concrete "Spectrum" container type, where aqpars and 
@@ -103,8 +111,18 @@ procpars can be accessed using dict indexing, e.g.
 BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int) = begin
     # below, changed joinpath to omit "fid", can't find this anywhere ?
     # fid = float(read_bruker_binary(path))
-    acqu = read_params(joinpath(path, "acqu"))
-    fid = float(read_bruker_binary(joinpath(path, "fid"))) .* 2^acqu["NC"]
+    acqu = read_params(joinpath(path, "acqus"))
+    
+    fid = zeros(acqu["TD"])
+    if "fid" in readdir(path)
+        fid = float(read_bruker_binary(joinpath(path, "fid"))) 
+    elseif "ser" in readdir(path)
+        fid = float(read_bruker_binary(joinpath(path, "ser"))) 
+    else
+        @error "No 'fid' or 'ser' found in $path."
+    end
+    fid .*= 2.0^acqu["NC"]
+     
     name = basename(dirname(path))
     expno = basename(path) 
 
@@ -125,14 +143,14 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
         proc_path = joinpath(path, "pdata", string(procno))
         procs[procno] = ProcessedSpectrum(proc_path, procno)
     end
-    BrukerSpectrum(fid, acqu, procs, default_proc, name, expno)
+   BrukerSpectrum(fid, acqu, procs, default_proc, name, expno)
 end
 
 BrukerSpectrum(path :: AbstractString, procno :: Int) = BrukerSpectrum(path, [procno], procno)
 
 
 """
-    BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
+   BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
 ----------------------------------------------------------------------------------
 Outermost constructor to import a spectrum. Prompts for a procno to set as the 
 default procno. Returns a concrete "Spectrum" container type, where aqpars and 
@@ -142,20 +160,22 @@ procpars can be accessed using dict indexing, e.g.
 """
 function BrukerSpectrum(path :: AbstractString; interactive = true)
     procpath = joinpath(path, "pdata")
-    if interactive
-        println.(parse.(Int, readdir(procpath)))
-        println("Choose a procno")
-        procno = parse.(Int, readline())
+    procnos = parse.(Int, readdir(procpath))
+    if !interactive || length(procnos) == 1
+        default_proc = minimum(procnos)
     else
-        procno = parse.(Int, readdir(procpath))
+        println.(procnos)
+        println("Choose a procno")
+        default_proc = parse.(Int, readline())
     end
-    BrukerSpectrum(path,  procno)
+    BrukerSpectrum(path, procnos, default_proc)
 end
+
 BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = BrukerSpectrum(path, procnos, minimum(procnos))
 
 function multiimport(fpath) 
     N = readdir(fpath)
-    data = Vector{Union{Missing,BrukerSpectrum}}(undef, length(N))
+    data = Vector{Union{Missing, BrukerSpectrum}}(undef, length(N))
     fill!(data,missing)
     for n in N
         try       

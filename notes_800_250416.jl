@@ -1,10 +1,13 @@
 # module imports
 using NMR, GLMakie, CairoMakie
+
 GLMakie.activate!()
+
 import NMR: SFO1, GMAX
 
 const dpath = joinpath(homedir(), "nmrdata/data/2025/b800mib/20250417")
-
+const Dpath = joinpath(homedir(), "nmrdata/data/2025/b800mib/20250423-nug/5")
+dosydata = BrukerSpectrum(Dpath)
 data = multiimport(dpath); expnos = [d.expno for d in data]
 S = (; (Symbol(expnos) .=> data)... )
 G = GMAX["CP-TCI-800S4"].z
@@ -32,9 +35,8 @@ slice_w = get_SliceLength.([0.05, 0.1, 0.2], 17.2e3; Gmax = G);
 # product of gaussian signal profile with bandwidth w centred at spoffs s₀, 
 # a linear gradient signal profile, and a d²g/dz² term
 #profile(w, s, s₀ = 0.,) = exp(-( (s-s0)/2.355w )^2 ) * ( (s - s₀) + (s^3 - s₀) )
-
 """ freq_profile(s, g)
-    - s <:  BrukerSpectrum
+    - s <: BrukerSpectrum
     - g - applied gradient, default "GPZ9" * GMAX
 --------------------------------------------------------------------
 """
@@ -42,7 +44,6 @@ function freq_profile(s, g)
     s_ζ = real(s)    
     
 end
-
 
 """ tau_to_p(gₛ, gᵣ, d32, p2, s) -> p ∈ ℕ₀.
     - gₛ : readout gradient intensity
