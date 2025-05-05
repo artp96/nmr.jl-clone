@@ -3,32 +3,36 @@ using Optimization, ForwardDiff
 using Base: debug_color
 using OptimizationOptimJL
 
+export auto_ϕ_correct, ϕ_correct, ϕ_correct!, auto_ϕ_correct2
+#! TODO: Automatic phase correction based on entropy minimisation, 
+# Reference:
+# Chen, Weng, Goh & Garland, 2002: viz. https://doi.org/10.1016/S1090-7807(02)00069-1
+# Solve with the simplex method, noting
+# 0 ≤ ϕ₀ ≤ 360°
+# 0 ≤ ϕ₁ / point  ≤ 360°
 
 """
-    ϕ_correct(s::Vector{C}, φ₀ :: F; φ₁ :: F = 0.) where { F <: AbstractFloat, C <: Complex{F}}
-    
-
-    Applies a zeroth and optionally a first order phase correction to a Fourier-transformed spectrum.
-    Arguments:
-    - `re_ft`: Real part of the Fourier-transformed spectrum.
-    - `im_ft`: Imaginary part of the Fourier-transformed spectrum.
-    - `φ0`: Zero-order phase correction (in degrees).
-    - `φ1`: First-order phase correction (in degrees).
-
-    Returns:
-    - `Vector{C}`: The corrected real part of the spectrum, ie.
-        the endomorphism 𝑓:𝑠 -> 𝑠.
+    ϕ_correct(s::Vector{C}, ϕ₀;:F=0., ϕ₁::F = 0.) where {F<:AbstractFloat,C<: Complex{F}}
+------------------------------------------------------------------------------------------- 
+Applies a zeroth and a first order phase correction to a Fourier-transformed spectrum.
+Arguments:
+- `re_ft`: Real part of the Fourier-transformed spectrum.
+- `im_ft`: Imaginary part of the Fourier-transformed spectrum.
+OR 
+- `s` : Complex spectrum
+AND
+- `φ0`: Zero-order phase correction (in degrees).
+- `φ1`: First-order phase correction (in degrees).
+Returns:
+- `Vector{C}`: ie. the endomorphism 𝑓:𝑠 -> 𝑠.
 """
-ϕ_correct(r::V, 𝑖::V, ϕ₀ :: T, ϕ₁::T=0.0) where {T <: AbstractFloat, V <: AbstractVector{T}} = ϕ_correct(s = Complex{T}.(r, 𝑖), ϕ₀, ϕ₁)
-
-function ϕ_correct(s::V, ϕ₀, ϕ₁) where { C <: Complex, V <: AbstractVector{C} }    
-    ϕ₀, ϕ₁ = deg2rad(ϕ₀), deg2rad(ϕ₁);
-    n = length(s)
-    # normalised frequency axis
-    ν = LinRange(0, 1, n) # |> collect |> cu 
-    ϕ = exp.(-1im .* (ϕ₀ .+ ϕ₁ .* ν))
-    return s .* ϕ
+function ϕ_correct(s::V, ϕ₀=0., ϕ₁=0.) where { C <: Complex, V <: AbstractVector{C} }    
+    return s .* exp.(-1im .* (deg2rad(ϕ₀) .+ deg2rad(ϕ₁) ./ eachindex(s)))
 end
+function ϕ_correct!(s::V, ϕ₀=0., ϕ₁=0.) where { C <: Complex, V <: AbstractVector{C} }    
+    return s .*= exp.(-1im .* (deg2rad(ϕ₀) .+ deg2rad(ϕ₁) ./ eachindex(s)))
+end
+ϕ_correct(r::V, 𝑖::V, ϕ₀ :: T, ϕ₁::T=0.0) where {T <: AbstractFloat, V <: AbstractVector{T}} = ϕ_correct((r.-im*𝑖), ϕ₀, ϕ₁)
 
 """
     auto_ϕ_correct(s :: V; 
@@ -42,12 +46,12 @@ end
             C <: Complex, 
             V <: AbstractVector{C}
             }
--------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
 Automatic phase correction function to take a 1-D spectrum and apply zeroth and 
-first order phase corrections ϕ₀, ϕ₁.
+first order phase corrections ϕ₀, ϕ₁. 
 """
 function auto_ϕ_correct(s :: V, idxs; 
-            f :: Function = (y -> sum(y[ y .< 0. ] .^ 2)), 
+            f :: Function = _imag_loss, 
                         ϕ₀:: T = 0.,
                         ϕ₁ :: T = 0.,
                         tol = 1e-3,
@@ -93,7 +97,7 @@ end
 _________________________________________________________________________________
 Inner function to iterate over fibres.
 """
-function auto_ϕ_correct(fibres :: F, idxs; kwargs...) where {F <: fibreIterator} 
+function auto_ϕ_correct0(fibres :: F, idxs; kwargs...) where {F <: fibreIterator} 
     isempty(idxs) && @error(AssertionError("Empty tuple propagated to fibreIterator auto_ϕ_correct, idxs should be defined at this point."))
     if debug
         println("idxs $idxs")
@@ -181,18 +185,13 @@ import GLMakie: lines
     
 Implements the bisection method rootfinding algorithm seeking the zero of a loss function 
 composed with a function of some data x ∈ ℂᴺ and a minimisation variable y ∈ ℝ¹. Requires
-    f :: F1 f(x, y) : x -> x'∈ ℂᴺ,
-    l :: F2 loss(x) : x'-> ε ∈ ℝ¹,
+    f :: F1 := f(x, y) : x -> x'∈ ℂᴺ,
+    l :: F2 := loss(x) : x'-> ε ∈ ℝ¹,
 and returns the minimising y value. The composition l ∘ f must be defined to bracket zero 
 at π intervals.
-
 Warning: will miss optima if there are an odd number of roots on y ∈ {0, π}, and fail if there are an even number!
 """
-function _bisection_solver(f :: F1, X :: A, loss :: F2;
-                           tol = 1e-3,
-                           y0 = missing,
-                           max_iter = 1e3,
-                           debug = false) where {
+function _bisection_solver(f :: F1, X :: A, loss :: F2; tol = 1e-3, y0 = missing, max_iter = 1000) where {
     F1 <: Function, F2 <: Function, A <: AbstractArray{<:Complex} }
     max_iter = Int(max_iter)
     
@@ -243,52 +242,6 @@ function _bisection_solver(f :: F1, X :: A, loss :: F2;
         filter!(iszero, ϕs)
         filter!(iszero, εs)
     end
-    # y_L = ismissing(y0) ? rand() * 2π : (y0 % 2π)
-    # debug && println("ln 221: y_L = $y_L")
-    # y_R = y_L - π
-    #
-    # g_L = g(x, y_L) 
-    # debug && println("ln 224: g_L = $g_L")
-    # g_L isa AbstractFloat ? ε = g_L : throw(error("l ∘ f (x,y) -> ε does not yield a float."))
-    #
-    # g_R = g(x, y_R)
-
-    
-    # error tracking for debugging
-    # if debug  
-    #     ε_vec = [ε]
-    # end
-    # mid = y_R - y_L / 2
-    # # initial error from left bisector
-    #
-    # iter = 0
-    # while ε > tol && iter < max_iter && abs(y_L - y_R) < 1e-3
-    #
-    #     mid = y_R - y_L / 2
-    #
-    #     ε_i = g(x, mid)    
-    #     # Seek a plateau; break out of the loop
-    #     if ε - ε_i < tol        
-    #         break
-    #
-    #     # handle minima in left half, where ε = ε(y_L)
-    #     elseif ε * ε_i < 0.
-    #         y_R = mid
-    #         # never need to evaluate the error at the right-hand bisector
-    #
-    #     # handle minima in the right half
-    #     else # ε * ε_i > 0.
-    #         # cache the error from this mid as the new left hand bisector
-    #         y_L = mid 
-    #         ε = ε_i
-    #     end
-    #
-    #
-    #     # new error is the error of the old mid value
-    #     debug && push!(ε_vec, ε_i)
-    #     ε = ε_i
-    #     iter += 1
-    # end
     return debug ? (ϕs, εs) : ϕₙ
 end
 
@@ -303,7 +256,6 @@ _imag_loss(S :: A) where A <: AbstractArray{<: Complex} = -sum(imag(S).^2)
 _norm_loss(S :: A) where A <: AbstractArray{<: Complex} = norm(real(S))
 L = _imag_loss
 
-export auto_ϕ_correct, ϕ_correct, auto_ϕ_correct2
 
 
 const test_tols = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
@@ -322,10 +274,10 @@ function test_phase_correction(v :: V, idxs :: Tuple, loss) where V <: AbstractV
     pairs = Vector{Any}(undef, length(test_tols))
     for i in eachindex(test_tols)
         tol = test_tols[i]
-        f(s, ϕ₀) = ϕ_correct(s, ϕ₀,0.)
+        f(s, ϕ₀) = ϕ_correct(s, ϕ₀, 0.)
         bm = @benchmark _bisection_solver($f, $v_, $loss; tol = $tol) 
 
-        ϕ₀, ε = _bisection_solver(f, v_, loss; tol = tol, debug = true) 
+        ϕ₀, ε = _bisection_solver(f, v_, loss; tol = tol) 
 
 
     pairs[i] = phase_correction_test(bm, ϕ₀, ε)

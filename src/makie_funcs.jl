@@ -150,7 +150,7 @@ lines(s::BrukerSpectrum, kind = real, p = s.default_proc, kwargs...) = lines(s[p
 
 const LINESTYLES = [:solid, :dash,:solid, :dash, :solid, :dash,:solid, :dash]
 
-function lines(p::P, kind::Function = real; colormap = :plasma, title = p.title, idxs = missing, axis_func = ppmaxis, kwargs... ) where P<:ProcessedSpectrum
+function lines(p::S, kind::Function = real; colormap = :plasma, title = "", idxs = missing, axis_func = ppmaxis, kwargs... ) where S<:AbstractSpectrum
     @assert in(kind, [real, imag, complex, abs]) "'kind = f::Function' kwarg must refer to one of 'real', 'imag', 'abs' or 'complex'."
     @assert in(axis_func, [ppmaxis, hzaxis, ζaxis, cmaxis]) "'axis_func = f::Function kwarg must refer to one of 'ppmaxis', hzaxis', 'ζaxis' or 'cmaxis'."
     if !ismissing(idxs) 
@@ -202,10 +202,10 @@ function lines(V::P, kind::Function = real;
                title = "No Title",
                idxs = missing, 
                axis_func = ppmaxis, 
-               labels = Vector{String}(), 
+               labels = collect(1:length(V)), 
                legtitle = "", 
                preproc::Function = identity, 
-               kwargs... ) where P<:Vector{<:ProcessedSpectrum}
+               kwargs... ) where P<:Vector{<:AbstractSpectrum}
 
     labels = string.(labels)
     @assert in(kind, [real, imag, complex, abs]) "'kind = f::Function' arg must refer to one of 'real', 'imag', 'abs' or 'complex'."

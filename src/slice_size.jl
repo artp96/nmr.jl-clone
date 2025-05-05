@@ -18,6 +18,7 @@ const GMAX = Dict{String, NamedTuple}(
     "BBO-300" => (z = 57., x = 0., y = 0.),
     "TBI-500" => (z = 67., x = 50., y = 50.),
     "CP-TCI-800S4" => (z = 65.7, x = 0., y = 0.),
+    "BBO-500S2-B11" => (z = 50.1, x = 0., y = 0.),
 
 )
 

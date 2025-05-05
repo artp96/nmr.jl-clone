@@ -9,6 +9,7 @@ const dpath = joinpath(homedir(), "nmrdata/data/2025/b800mib/20250417")
 const Dpath = joinpath(homedir(), "nmrdata/data/2025/b800mib/20250423-nug/5")
 dosydata = BrukerSpectrum(Dpath)
 data = multiimport(dpath); expnos = [d.expno for d in data]
+ws = WrappedSpectrum.(data)
 S = (; (Symbol(expnos) .=> data)... )
 G = GMAX["CP-TCI-800S4"].z
 
@@ -30,20 +31,6 @@ zgr_vol = get_ActiveVolume(0.2, 7.85; instrument = "MIBB800", Gmax = G, message 
 Δδ = [587, 1087, 1928] ./ 8e2; kHz_bandwidth = [5e3, 10e3, 17.2e3]
 kHz_bws = NamedTuple( Symbol.(kHz_bandwidth) .=> get_ActiveVolume.(0.01, Δδ; instrument = "MIBB800", Gmax = G, message = false) )
 slice_w = get_SliceLength.([0.05, 0.1, 0.2], 17.2e3; Gmax = G);
-
-
-# product of gaussian signal profile with bandwidth w centred at spoffs s₀, 
-# a linear gradient signal profile, and a d²g/dz² term
-#profile(w, s, s₀ = 0.,) = exp(-( (s-s0)/2.355w )^2 ) * ( (s - s₀) + (s^3 - s₀) )
-""" freq_profile(s, g)
-    - s <: BrukerSpectrum
-    - g - applied gradient, default "GPZ9" * GMAX
---------------------------------------------------------------------
-"""
-function freq_profile(s, g)
-    s_ζ = real(s)    
-    
-end
 
 """ tau_to_p(gₛ, gᵣ, d32, p2, s) -> p ∈ ℕ₀.
     - gₛ : readout gradient intensity
@@ -80,3 +67,5 @@ legend = [-6, -7, -8, -9, -10, -11]; legtitle = "p2 dB"
 nums = 27:32
 plot1 = lines(data[nums], labels = legend, idxs = idxs, title = title, legtitle = legtitle)
 save(joinpath(figdir, "17kHz20pc_powercal.pdf"), plot1; backend = CairoMakie)
+
+

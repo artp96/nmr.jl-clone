@@ -55,9 +55,12 @@ include("show.jl")
 include("makie_funcs.jl")
 include("slice_size.jl")
 include("bruker/popt.jl")
+include("bruker/fid_import.jl")
 include("eachfibre.jl")
-include("phase_correction.jl")
-include("window_functions.jl")
+include("processing/phase_correction.jl")
+include("processing/window_functions.jl")
+include("processing/transforms.jl")
+include("processing/zerofill.jl")
 
 try
     if debug

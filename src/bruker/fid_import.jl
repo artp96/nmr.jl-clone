@@ -1,77 +1,66 @@
-""" fid_DSF_undo(s <: BrukerSpectrum, zf = TD) -> fid
------------------------------------------------------------------------------------
+""" fid_DSF_undo(s <: BrukerSpectrum, f = Id) -> fid
+-------------------------------------------------------------------------------------------
 A special function to apply the appropriate compensation to "undo" an aspect of 
 Bruker's DSP which appends data prior to the zero-time point of acquisition for the 
 purposes of convolution padding.
 Must be called _after_ the FID is made complex. 
- 
-- n.b. Calling zero_fill(s) on a BrukerSpectrum is a thin wrapper to this function.
-!TODO: change this to have a wrapper to act on the BrukerSpectrum struct but an inner
-function which can be called for correct apodization, zerofilling, and to have for 
-use in an abstract WrappedSpectrum struct.
+Optionally, pass a function f as the second argument to be performed on the FID _without_ 
+the prepended DSP convolutional padding. This is valid for e.g. line_broadening(s, hz) or 
+zero_fill(s, k) in the Bruker context.
 
 References
  1. W. M. Wrestler and F. Abildgaard, 1996
  2. M. Nilsson & the UoM GNAT collaboration, 2025
 """
-function fid_DSF_undo(s :: BrukerSpectrum)
-    zf = zf > s["TD"] ? zf : s["TD"] && @warn("Cannot zero fill less than TD. Setting zf = TD.")
-    
-    k, ϕ = getoffset(s)
+function fid_DSF_undo(s :: BrukerSpectrum, f = identity)
+    k = floor(Int, get_DSF_offset(s))
     if iszero(k+ϕ) 
-        @warn "Expno $(s.expno) GRPDLY evaluated to zero, assuming no DSP to correct!"
+        @warn "Expno $(s.expno) GRPDLY evaluated to zero, 
+        \nassuming no DSP to correct!"
         return s
     end
-    for f in eachfibre(s.fid)
-        circshift!(f, k)
-    end
-    return fid
+    #fids = s.fid
+    v = s.fid
+    #for fid in eachfibre(fids)
+    dsp = deepcopy(v[1:k])
+        v = v[k+1:end]
+        v = f(v)
+        append!(dsp, v)
+    #end
+    return v
 end
 
-"""getoffset(s <: BrukerSpectrum) -> x ∈ u64, y ∈ f64
-------------------------------------------------------------------------------------
+""" getoffset(s <: BrukerSpectrum) -> x ∈ u64, y ∈ f64
+-------------------------------------------------------------------------------------------
 Get the GRPDLY offset or look it up, and return the offset and first-order ϕ₁(ω)
 factor in (° Hz⁻¹).
 """
-function getoffset(s :: BrukerSpectrum)
+function get_DSF_offset(s :: BrukerSpectrum)
     # simplest case - return GRPDLY iff ∃d > 0.
-    if haskey(s, "GRPDLY") & s["GRPDLY"] > 0
-        offset = s["GRPDLY"] 
-    elseif haskey(s, "GRPDLY") 
-        grpdly = haskey(s, "GRPDLY") ? s["GRPDLY"] : "missing"
-        decim = haskey(s, "DECIM") ? s["DECIM"] : "missing"
-        dspfvs = haskey(s, "DSPFVS") ? s["DSPFVS"] : "missing"
-        Throw(ErrorException("GRPDLY defined ≤ 0!
+    if haskey(s, "GRPDLY")
+        offset = 0 < s["GRPDLY"] ? s["GRPDLY"] : Throw(ErrorException(
+        "GRPDLY defined ≤ 0!
         \nCheck that the values for expno $(s.expno) are listed in the table in nmr.jl/src/fid_import.jl.
-        \nGRPDLY = $(grpdly)
-        \nDECIM  = $(decim)
-        \nDSPFVS = $(dspfvs)")
-        )
+        \nGRPDLY = $(haskey(s, GRPDLY) ? s["GRPDLY"] : "missing")
+        \nDECIM  = $(haskey(s, DECIM) ? s["DECIM"] : "missing")
+        \nDSPFVS  = $(haskey(s, DSPFVS) ? s["DSPFVS"] : "missing")"))
     else
         # otherwise
         row = findfirst(isequal(s["DECIM"]), DSP_TABLE)
         col = s["DSPFVS"] - 9 # Only the 10, 11, 12 cases are listed, why be fancy?
-        #trY
+        try 
             offset = DSP_TABLE[row,col]
-        #=
-        catch e
-            grpdly = haskey(s, "GRPDLY") ? s["GRPDLY"] : "missing"
-            decim = haskey(s, "DECIM") ? s["DECIM"] : "missing"
-            dspfvs = haskey(s, "DSPFVS") ? s["DSPFVS"] : "missing"
+        catch err
             Throw(ErrorException("Couldn't lookup DSP value!
             \nCheck that the values for expno $(s.expno) are listed in the table in src/fid_import.jl.
-            \nGRPDLY = $(grpdly)
-            \nDECIM  = $(decim)
-            \nDSPFVS = $(dspfvs)")
-            \n$err")
-            )
+            \nGRPDLY = $(haskey(s, GRPDLY) ? s["GRPDLY"] : "missing")
+            \nDECIM  = $(haskey(s, DECIM) ? s["DECIM"] : "missing")
+            \nDSPFVS  = $(haskey(s, DSPFVS) ? s["DSPFVS"] : "missing")
+            \n$err"))
         end
-        =#
     end
-    points = floor(Int, offset)
-    ϕ_dsp = (offset - points) * 360
-    ϕ_dsp *= 1/2 * s["TD"] / (s["SFO1"] * s["SW"])
-    return points, ϕ_dsp
+
+    return -1offset
 end
 
 const DSP_TABLE=[
@@ -98,10 +87,11 @@ const DSP_TABLE=[
       1536      61.657       71.917           0.;
       2048      70.492       72.031           0.]
 
-export fid_DSF_undo
+export fid_DSF_undo, get_DSF_offset
 
 
-#=  APPENDIX
+#=
+""" APPENDIX
     Based on the procedure described below - A.C.P. 2025.
     Sourced via a comment in UoM GNAT, M Nilsson.
 -----------------------------------------------------------------------------------
@@ -149,7 +139,6 @@ W. M. Westler and F.  Abildgaard
     corresponding to a time shift of a single complex dwell point is 360 degrees
     across the spectral width. The typical number of prepended points
     found in DMX digitally filtered data is about 60 data points (see below),
-
     the corresponding 1st order phase correction is ~21,000 degrees.
     This large linear phase correction can be applied to the transformed data
     to obtain a normal spectrum. Another, equivalent approach is to time
@@ -207,11 +196,12 @@ W. M. Westler and F.  Abildgaard
     1536              61.6566         71.9167
     2048              70.4924         72.0313
 
+
     The number of points obtained from the table are usually not integers.  
     The appropriate procedure is to circular shift (see protocol for details) by the integer
     obtained from truncation of the obtained value and then the residual 1st order phase shift
-    that needs to be applied can be obtained by multiplying the decimal portion of the 
-    calculated number of points by 360.
+    that needs to be applied can be obtained by multiplying the decimal
+    portion of the calculated number of points by 360.
 
     For example,
 
@@ -247,4 +237,5 @@ W. M. Westler and F.  Abildgaard
 
        4) The data can now be Fourier transformed and the residual calculated
        1st order phase correction can be applied.
+"""
 =#

@@ -18,14 +18,18 @@ function parse_or(::Type{T}, s, default::T) where T
     v === nothing ? default : v
 end
 
-const filters = [ ( Set(["SW", "SW_h", 
+#TODO: Make const
+#const
+filters = [ ( Set(["SW", "SW_h", 
     "O1", "O2", "O3", 
     "SFO1", "SFO2", "SFO3", "SF", 
     "BF1", "BF2", "BF3", 
+    "PHC0", "PHC1", "LB", 
     # GRPDLY / DSP Variables.
     "GRPDLY", "DSPFVS", "DECIM"]),
               s -> parse(Float64, s) ),
-            ( Set(["TD","TD0", "NS", "DS", "SI", "NC", "NC_proc"]),
+            ( Set(["TD","TD0", "NS", "DS", "SI", "NC", "NC_proc",
+                "FnMODE",]),
               s -> parse(Int, s) ),
             ( Set(["D", "P", "GPX", "GPY", "GPZ"]),
               parse_float_list),

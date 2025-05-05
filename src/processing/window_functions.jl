@@ -10,10 +10,15 @@
 Apply a gaussian broadening function. The true start of acquisition 
 (first non-zero point in the FID) is defined as t₀.
 """
-function exp_window(s :: S, b) where S <: AbstractSpectrum
+function exp_window(s :: S, b) where S <: BrukerSpectrum
     b = float(b)
-    dt = s["AQ"] / s["TD"]
-    
+    dt = s["DW"] 
+    t₀, ϕ₁ = get_DSF_offset(s)
+    t = 1:s["TD"] .- t₀
+    for fid in eachfibre(s.fid)
+            fid .*= exp.( t  * dt / b )
+    end
+    return s
 end
 
 """
