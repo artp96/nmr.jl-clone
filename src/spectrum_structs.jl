@@ -90,7 +90,7 @@ Following Bruker convention:
 - **name**: Experiment name
 - **expno**: Experiment number if, e.g., part of a Bruker dataset
 """
-struct BrukerSpectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, P <: ProcessedSpectrum{T}}  <: AbstractSpectrum
+struct BrukerSpectrum{C <: Complex, V <: AbstractVector{C}, P <: ProcessedSpectrum}  <: AbstractSpectrum
     fid :: V
     acqu :: Dict{String, Any}
     procs :: Dict{Int, P}
@@ -98,9 +98,10 @@ struct BrukerSpectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, P 
     name :: String
     expno :: Int
         
-    # Inner constructor to handle weakly typed dicts & split the FID.
-    function BrukerSpectrum(f :: V, a :: Dict{S, Any}, p :: Dict{I, P}, d :: I, n :: String, e :: I) where {
-        # Type-fu is intensifying #
+end
+    # Outer constructor to handle weakly typed dicts & split the "Real" FID.
+function BrukerSpectrum(f :: V, a :: Dict{S, Any}, p :: Dict{I, P}, d :: I, n :: String, e :: I) where {
+# Type-fu is intensifying #
         T <: AbstractFloat, 
         V <: AbstractVector{T}, 
         P <: ProcessedSpectrum{T, V}, 
@@ -113,10 +114,9 @@ struct BrukerSpectrum{T <: AbstractFloat, V <: AbstractVector{<: Complex{T}}, P 
         end
         W = typeof(f)
         # Copy the acqupars into each procno
-        s = new{T, W, P}(f, a, p, d, n, e)
+        s = BrukerSpectrum(f, a, p, d, n, e)
         ParamDict(s)
         return s
-    end
 end
 
 Base.getindex(s::BrukerSpectrum, i::Int) = s.procs[i]
@@ -140,10 +140,14 @@ Base.setindex!(s::BrukerSpectrum, d::AbstractArray, ::Colon) = (s[s.default_proc
 Base.setindex!(s::BrukerSpectrum, d::AbstractArray, r::UnitRange) = (s[s.default_proc].re_ft[r] .= d)
 Base.setindex!(s::BrukerSpectrum, d, rng::Tuple{Float64, Float64}) = (s[s.default_proc].re_ft[ppmtoindex(s,rng)]=d)
 
-function BrukerSpectrum(fid :: V, acqu :: Dict{S, Any}, proc :: P) where {
-    T <: AbstractFloat, V <: AbstractVector{T}, S <: AbstractString, P <: ProcessedSpectrum{T, V}
+function BrukerSpectrum(fid :: V, acqu :: Dict{S, Any}, proc :: P) where 
+    {
+    T <: AbstractFloat, 
+    V <: AbstractVector{T}, 
+    S <: AbstractString, 
+    P <: ProcessedSpectrum{T, V}
     }
-    s = BrukerSpectrum(fid, acqu, Dict{Int, ProcessedSpectrum{T, V}}(1=>proc), 1, "", "")
+    return BrukerSpectrum(fid, acqu, Dict{Int, ProcessedSpectrum}(1=>proc), 1, "", "")
 end
 
 """
@@ -355,33 +359,33 @@ mutable struct WrappedSpectrum{
     ft :: A # time domain data
     fs :: A # freq domain data
     src :: BrukerSpectrum
-    fplan :: P where P <: AbstractFFTs.Plan
-    iplan :: P where P <: AbstractFFTs.Plan
+    #fplan :: P where P <: AbstractFFTs.Plan
+    #iplan :: P where P <: AbstractFFTs.Plan
     params :: D where D <: Dict{String, Any}
     expno :: Int64
     # Inner constructor method which re-gets dimstate
-    function WrappedSpectrum(n::String,ft::A,fs::A,src::B,fp::P,ip::P,e::Int64) where {
+    function WrappedSpectrum(n::String,ft::A,fs::A,src::B,e::Int64) where {
         C <: Complex,
         A <: AbstractArray{C, N} where N,
         B <: BrukerSpectrum,
-        P <: AbstractFFTs.Plan
     }
         # get the structure of the FID - 2D, or pseudo-2D
-        new{C, A}(n,ft,fs,src,fp,ip,Dict{String,Any}(),e)
+        new{C, A}(n, ft, fs, src, Dict{String,Any}(), e)
     end
 end
 
 """ WrappedSpectrum(s::BrukerSpectrum)
 -------------------------------------------------------------------------------------------
-Outer constructor to wrap a Bruker expno, transforming the FID and storing FFT coeffs."""
+Outer constructor to wrap a Bruker expno, transforming the FID and storing FFT coeffs.
+By default, stores on the GPU if available."""
 function WrappedSpectrum(src::BrukerSpectrum)
     # get the structure of the FID - 2D, or pseudo-2D
-    dims = range(1, ndims(src.fid)) |> collect
-    dims = src["FnMODE"] ≥ 2 ? dims : dims[1:end-1]
-    ft = src.fid
-    fs, fplan = fft(src)
-    iplan = plan_fft(ft, dims)
-    return WrappedSpectrum(src.name, ft, fs, src, fplan, iplan, src.expno)
+    #dims = range(1, ndims(src.fid)) |> collect
+    #dims = src["FnMODE"] ≥ 2 ? dims : dims[1:end]
+    dims = src["FnMODE"] ≥ 2 ? [1, 2] : [1]
+    ft = gpu(zero_fill(src.fid, src["SI"]))
+    fs = fft(src)
+    return WrappedSpectrum(src.name, ft, fs, src, src.expno)
 end
 
 # Convenience methods to access the spectrum

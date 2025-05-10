@@ -155,7 +155,7 @@ BrukerSpectrum(path :: AbstractString, procno :: Int) = BrukerSpectrum(path, [pr
 
 """
    BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
-----------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
 Outermost constructor to import a spectrum. Prompts for a procno to set as the 
 default procno. Returns a concrete "Spectrum" container type, where aqpars and 
 procpars can be accessed using dict indexing, e.g.
@@ -177,18 +177,37 @@ end
 
 BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = BrukerSpectrum(path, procnos, minimum(procnos))
 
-function multiimport(fpath) 
+"""
+    multiimport(fpath::AbstractString) 
+-------------------------------------------------------------------------------------------
+"""
+function multiimport(fpath::AbstractString) 
     N = readdir(fpath)
     data = Vector{Union{Missing, BrukerSpectrum}}(undef, length(N))
     fill!(data,missing)
-    for n in N
+    Threads.@threads for (i,n) in enumerate(N)
         try       
-            data[parse(Int,n)] = BrukerSpectrum(joinpath(fpath, n); interactive = false)
+            data[i] = BrukerSpectrum(joinpath(fpath, n); interactive = false)
         catch e
             println("Could not parse expno $n:\n$e.")
         end
     end
     # ensures element type stability
-    return skipmissing(data) |> collect
+    return collect(data)
 end
-export read_bruker_binary, multiimport
+
+multiwrap(V::Vector{Union{Missing, BrukerSpectrum}}) = begin
+    wrap = Vector{WrappedSpectrum}(undef, length(V))
+    Threads.@threads for i in eachindex(V)
+        if !ismissing(V[i])
+            wrap[i] = WrappedSpectrum(V[i]) 
+        else
+            @info("Expno $i was not imported.")
+        end
+    end
+    return wrap
+end
+multiwrap(fpath::AbstractString) = multiwrap(multiimport(fpath))
+
+export read_bruker_binary, multiimport, multiwrap
+

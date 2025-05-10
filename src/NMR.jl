@@ -3,16 +3,21 @@ module NMR
 """γₚ, ¹H gyromagnetic ratio in MHz T⁻¹. """
 const γₚ = 42.577478461 
 
-using ProgressBars
 using DataFrames 
+using DSP # Digital Signal processing
+using FastTransforms
+using FFTW
+using ForwardDiff
 using GLMakie; GLMakie.activate!()
-using LaTeXStrings
 using Interpolations
+using LaTeXStrings
 using LinearAlgebra: norm, normalize, dot
+using Optimization
+using Optim
+using ProgressBars
 using Statistics
 using RecipesBase
-using FFTW
-using FastTransforms
+
 using CUDA
 if has_cuda() & has_cuda_gpu()
     @info "CUDA found. GPU mode."
@@ -50,6 +55,7 @@ include("interpolation.jl")
 # using Plots
 #include("plotting.jl")
 include("show.jl")
+include("gpu_utils.jl")
 
 # AP's things
 include("makie_funcs.jl")

@@ -7,7 +7,8 @@
 using DataFrames
 I = Int64
 
-function lineplot_Complex(s :: S; procno = false, palette = nothing, kwargs...) where S <: PoptSpectrum
+function lineplot_Complex(s :: S; 
+procno = false, palette = nothing, kwargs...) where S <: PoptSpectrum
     # get last procno by default
     !procno ? procno = s.default_proc : procno
     fig = Figure()
@@ -43,7 +44,11 @@ function splatted_heatmaps(a :: A, dims :: T, vars :: NT; colormap = :plasma) wh
     x, y = filter(xy -> xy != z, varnames)
 
     n = length(slices)
-    isinteger(sqrt(n)) ? (grid_w, grid_h) = (Int.(sqrt(n)), Int.(sqrt(n))) : (grid_w, grid_h) = (ceil(I, sqrt(n)), floor(I, sqrt(n)))
+    if isinteger(sqrt(n)) 
+        (grid_w, grid_h) = (Int.(sqrt(n)), Int.(sqrt(n))) 
+    else
+        (grid_w, grid_h) = (ceil(I, sqrt(n)), floor(I, sqrt(n)))
+    end
     fig = Figure(; size = (1600, 1000))
     for col in 1:grid_w, row in 1:grid_h
         idx = (row - 1) * grid_w + col
@@ -150,7 +155,15 @@ lines(s::BrukerSpectrum, kind = real, p = s.default_proc, kwargs...) = lines(s[p
 
 const LINESTYLES = [:solid, :dash,:solid, :dash, :solid, :dash,:solid, :dash]
 
-function lines(p::S, kind::Function = real; colormap = :plasma, title = "", idxs = missing, axis_func = ppmaxis, kwargs... ) where S<:AbstractSpectrum
+function lines(p::S, 
+               kind::Function = real; 
+               colormap = :plasma, 
+               title = "", 
+               idxs = missing, 
+               axis_func = 
+               ppmaxis, 
+               kwargs... ) where S<:AbstractSpectrum
+
     @assert in(kind, [real, imag, complex, abs]) "'kind = f::Function' kwarg must refer to one of 'real', 'imag', 'abs' or 'complex'."
     @assert in(axis_func, [ppmaxis, hzaxis, ζaxis, cmaxis]) "'axis_func = f::Function kwarg must refer to one of 'ppmaxis', hzaxis', 'ζaxis' or 'cmaxis'."
     if !ismissing(idxs) 
@@ -214,7 +227,7 @@ function lines(V::P, kind::Function = real;
     # ppm axis should be relative to widest spectrum
     max, pno = findmax([size(v) for v ∈ V])
 
-    p = V[pno]
+    p = V[pno] 
     idx1, idx2 = trim_spectrum(p)
     if !ismissing(idxs) 
         @info "Passed indices to lines() plot are expected to be a tuple in idxs = (ppm, ppm) format."

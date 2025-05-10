@@ -15,10 +15,11 @@ spectrum in question. Returns a transformed array, by default phase corrected us
 Bruker parameters PHC0 and PHC1 respectively.
 Optionally, pass a specific array as fid to test the processing associated with 's'. 
 """
-fft(s::S; ft::A=s.fid) where {S<:AbstractSpectrum,A<:AbstractArray} = fft(s, s["PHC0"], s["PHC1"]; ft=ft)
-fft(w::W; ft::A=s.ft) where {W<:WrappedSpectrum,A<:AbstractArray} = fft(w, w["PHC0"], w["PHC1"]; ft=ft)
+fft(s::S) where S<:AbstractSpectrum = fft(s, s["PHC0"], s["PHC1"])
+fft(w::W; ft::A=w.ft) where {W<:WrappedSpectrum,A<:AbstractArray} = fft(w, w["PHC0"], w["PHC1"]; ft=ft)
 
-function fft(w::WrappedSpectrum, ϕ₀::T, ϕ₁::T; ft=w.ft) where {
+function fft(w::WrappedSpectrum, ϕ₀::T, ϕ₁::T; ft=w.ft) where 
+    {
     T<:AbstractFloat,
     } 
     k = get_DSF_offset(w.src)
@@ -29,8 +30,7 @@ function fft(w::WrappedSpectrum, ϕ₀::T, ϕ₁::T; ft=w.ft) where {
         k = floor(Int, k)
     end
     # transform the spectrum efficiently using the fft plan
-    fs = plan * ft
-    fftshift!(fs, 1)
+    fs = fftshift(fft(ft), 1)
     # Apply the phase correction in f1, only.
     for fₖs in eachfibre(fs)
         ϕ_correct!(fₖs, ϕ₀, ϕ₁)
@@ -41,9 +41,9 @@ end
 
 # fft the FID of a Bruker Spectrum, returning the spectrum and plan used. Applies
 # default zero filling based on SI and phase correction based on PHC0/1.
-function fft(s::BrukerSpectrum, ϕ₀::T, ϕ₁::T; ft::A=s.fid) where {
-    T<:AbstractFloat,
-    A<:AbstractArray
+function fft(s::BrukerSpectrum, ϕ₀::T, ϕ₁::T) where
+    {
+        T<:AbstractFloat,
     } 
     dims = s["FnMODE"] ≥ 2 ? [1, 2] : [1]
     k = get_DSF_offset(s)    
@@ -54,16 +54,16 @@ function fft(s::BrukerSpectrum, ϕ₀::T, ϕ₁::T; ft::A=s.fid) where {
         k = floor(Int, k)
     end
     # apply the default zero filling
-    ft = zero_fill(s)
+    ft = zero_fill(s) |> gpu
     plan = plan_fft(ft, dims)
-    fs = plan * circshift(ft, k)
+    fs = fft(circshift(ft, k))
     fs = fftshift(fs, 1)
     # Apply the phase correction in f1, only.
     for fₖs in eachfibre(fs)
         ϕ_correct!(fₖs, ϕ₀, ϕ₁)
     end
     # return the transformed ft.
-    return fs, plan
+    return fs
 end
 
 # Fourier transform a fid and apply an analytical first order phase offset 
@@ -83,14 +83,14 @@ end
 -------------------------------------------------------------------------------------------
 Generate an FID from the real and imaginary parts of a processed Bruker spectrum.
 """ 
-ifft(p::P) where P<:ProcessedSpectrum = ifft(fftshift(complex(p)))
+ifft(p::P) where P<:ProcessedSpectrum = ifft(ifftshift(complex(p)))
 
 
 """ ifft(W <: WrappedSpectrum) -> f(t)
 -------------------------------------------------------------------------------------------
 Generate an FID from the real and imaginary parts of an NMR.jl-wrapped spectrum.
 """
-ifft(w::WrappedSpectrum) = ifft(fftshift(w.s))
+ifft(w::WrappedSpectrum) = ifft(ifftshift(w.s))
 
 #! TODO fix this / have stateful transforms
 """dimstate(s::AbstractSpectrum) -> [Int]
