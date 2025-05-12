@@ -153,7 +153,8 @@ import GLMakie: lines
 # some quick wrappers for lines
 lines(s::BrukerSpectrum, kind = real, p = s.default_proc, kwargs...) = lines(s[p], kind; kwargs...)
 
-const LINESTYLES = [:solid, :dash,:solid, :dash, :solid, :dash,:solid, :dash]
+const LINESTYLES = [:solid, :dash,:solid, :dash, :solid, :dash, :solid, :dash]
+
 
 function lines(p::S, 
                kind::Function = real; 

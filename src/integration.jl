@@ -1,3 +1,4 @@
+export intensity, integrate
 intrng(s::BrukerSpectrum) = s[s.default_proc].intrng
 intrng(p::PoptSpectrum) = p.proc.intrng
 intrng(w::WrappedSpectrum) = intrng(w.src)
@@ -59,3 +60,28 @@ function integrate(s::BrukerSpectrum, ref_rng::Int)
 end
 
 integrate(s::BrukerSpectrum, δ::Float64) = integrate(s, find_rng(s, δ))
+###########################################################################
+
+
+intensity(v::Vector, r::UnitRange) = maximum(v[r])
+intensity(p::ProcessedSpectrum, r::UnitRange) = intensity(p[:], r)
+intensity(s::BrukerSpectrum, r::UnitRange) = intensity(s[s.default_proc], r)
+
+function intensity(s::BrukerSpectrum, ppm_range::Tuple{Float64,Float64})
+    r1 = ppmtoindex(s, ppm_range[1])
+    r2 = ppmtoindex(s, ppm_range[2])
+    intensity(s, r1:r2)
+end
+
+function intensity(s::BrukerSpectrum)
+    [intensity(s, r) for r in intrng(s)]
+end
+
+function intensity(s::BrukerSpectrum, ref_rng::Int)
+    rngs = intrng(s)
+    ref_int = intensity(s, rngs[ref_rng])
+    intensity(s)./ref_int
+end
+
+intensity(s::BrukerSpectrum, δ::Float64) = intensity(s, find_rng(s, δ))
+

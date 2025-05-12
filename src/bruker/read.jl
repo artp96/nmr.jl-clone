@@ -185,7 +185,8 @@ function multiimport(fpath::AbstractString)
     N = readdir(fpath)
     data = Vector{Union{Missing, BrukerSpectrum}}(undef, length(N))
     fill!(data,missing)
-    Threads.@threads for (i,n) in enumerate(N)
+    #Threads.@threads 
+    for (i, n) in enumerate(N)
         try       
             data[i] = BrukerSpectrum(joinpath(fpath, n); interactive = false)
         catch e
@@ -210,4 +211,3 @@ end
 multiwrap(fpath::AbstractString) = multiwrap(multiimport(fpath))
 
 export read_bruker_binary, multiimport, multiwrap
-
