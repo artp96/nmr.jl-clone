@@ -1,3 +1,4 @@
 [deps]
+DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
 NMR = "ccd5ae15-cd25-53ab-b4f2-e0ae14ef09d4"
 ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"

@@ -31,7 +31,7 @@ filters = [ ( Set(["SW", "SW_h",
             ( Set(["TD","TD0", "NS", "DS", "SI", "NC", "NC_proc",
                 "FnMODE",]),
               s -> parse(Int, s) ),
-            ( Set(["D", "P", "GPX", "GPY", "GPZ"]),
+            ( Set(["D", "P", "GPX", "GPY", "GPZ", "CNST"]),
               parse_float_list),
             ( Set(["PULPROG"]),
               x -> strip(x)[2:end-1] ),
@@ -177,37 +177,60 @@ end
 
 BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = BrukerSpectrum(path, procnos, minimum(procnos))
 
+
 """
     multiimport(fpath::AbstractString) 
 -------------------------------------------------------------------------------------------
+Import an array of Bruker spectra from a folder as WrappedSpectrum.
+- fpath : path/to/folder/of/expnos
+- givemissing : Optionally keep the indices of files which 
+could not be imported as v[idx] = "missing".
 """
-function multiimport(fpath::AbstractString) 
+function multiimport(fpath::AbstractString; givemissing = false) 
     N = readdir(fpath)
     data = Vector{Union{Missing, BrukerSpectrum}}(undef, length(N))
     fill!(data,missing)
-    #Threads.@threads 
-    for (i, n) in enumerate(N)
+    Threads.@threads for i in eachindex(data)
         try       
-            data[i] = BrukerSpectrum(joinpath(fpath, n); interactive = false)
+            data[i] = BrukerSpectrum(joinpath(fpath, N[i]); interactive = false)
         catch e
-            println("Could not parse expno $n:\n$e.")
+            println("Could not parse expno $(N[i]):\n$e.")
         end
     end
     # ensures element type stability
-    return collect(data)
-end
+    if !givemissing 
+        filter!(!ismissing, data)
+        data = convert(Vector{BrukerSpectrum}, data)
+    end
+    return data
+end 
 
-multiwrap(V::Vector{Union{Missing, BrukerSpectrum}}) = begin
-    wrap = Vector{WrappedSpectrum}(undef, length(V))
+"""
+    multiwrap(fpath::AbstractString) 
+-------------------------------------------------------------------------------------------
+Import an array of Bruker spectra from a folder as WrappedSpectrum.
+- fpath : path/to/folder/of/expnos
+- givemissing : Optionally keep the indices of files which 
+could not be imported as v[idx] = "missing".
+Calls multiimport under the hood.
+"""
+multiwrap(V::W; givemissing = false, index = true) where W <: AbstractVector = begin
+    wrap = Vector{Union{Missing, WrappedSpectrum}}(undef, length(V))
     Threads.@threads for i in eachindex(V)
         if !ismissing(V[i])
             wrap[i] = WrappedSpectrum(V[i]) 
         else
             @info("Expno $i was not imported.")
+            wrap[i] = missing
         end
     end
-    return wrap
+    if !givemissing 
+        filter!(!ismissing, wrap) 
+        data = convert(Vector{WrappedSpectrum}, wrap)
+    end
+    return wrap = index ? Dict([w.expno => w for w in wrap]) : wrap
 end
-multiwrap(fpath::AbstractString) = multiwrap(multiimport(fpath))
+multiwrap(fpath::AbstractString; kwargs...) = multiwrap(multiimport(fpath; kwargs...))
 
+Base.getindex(d::D, r::R) where {D<:Dict{Int,<:AbstractSpectrum}, R<:UnitRange} = [d[i] for i in r]
 export read_bruker_binary, multiimport, multiwrap

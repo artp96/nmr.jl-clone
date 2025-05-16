@@ -76,6 +76,10 @@ function ppmtoindex(s :: S, δ) where S <: AbstractSpectrum
     min_δ, max_δ = limits(s)
     @. Int(cld(s["SI"]*(max_δ - δ), (max_δ - min_δ)))
 end
+function ppmtoindex(w :: W, δ) where W <: WrappedSpectrum
+    min_δ, max_δ = limits(w)
+    Int(cld(length(w.fs)*(max_δ - δ), (max_δ - min_δ)))
+end
 
 """
     ppmtoindex(::PoptSpectrum, δ)
@@ -189,6 +193,10 @@ hztoζ(Δω, g) = Δω / (1e4 * g)
 ppmaxis(s::S; SI = s["SI"]) where S <: AbstractSpectrum = LinRange(limits(s)..., SI)
 hzaxis(s::S; SI = s["SI"]) where S <: AbstractSpectrum = LinRange(s["O1"] - s["SW_h"] / 2, s["O1"] + s["SW_h"] / 2, SI)
 ζaxis(s::S; SI = s["SI"]) where S <: AbstractSpectrum = hztoζ.(hzaxis(s; SI = SI))
+
+ppmaxis(w::W; SI = length(w.fs)) where W <: WrappedSpectrum = LinRange(limits(w)..., SI)
+hzaxis(w::W; SI = length(w.fs)) where W <: WrappedSpectrum = LinRange(w["O1"] - w["SW_h"] / 2, w["O1"] + w["SW_h"] / 2, SI)
+ζaxis(w::W; SI = length(w.fs)) where W <: WrappedSpectrum = hztoζ.(hzaxis(w; SI = SI))
 
 #! TODO implement cmaxis. This function will require a probe-specific gradient map!
 # 

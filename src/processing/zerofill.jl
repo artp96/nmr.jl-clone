@@ -9,7 +9,7 @@ Bottom level function to append zeroes to the FID stored in vector v, until it h
 """
 function zero_fill(v :: V, k :: Int64) where V <: AbstractVector
     if k < length(v) 
-        @warn "k < TD, truncating FID by $(length(v)-k)!"
+        #@warn "k < TD, truncating FID by $(length(v)-k)!"
         return w = v[1:k]
     elseif k > length(v)
         w = v

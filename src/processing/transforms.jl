@@ -41,29 +41,54 @@ end
 
 # fft the FID of a Bruker Spectrum, returning the spectrum and plan used. Applies
 # default zero filling based on SI and phase correction based on PHC0/1.
-function fft(s::BrukerSpectrum, ϕ₀::T, ϕ₁::T) where
+function fft(s::BrukerSpectrum, ϕ₀::T=s["PHC0"], ϕ₁::T=s["PHC1"]; give_processed_fid = false) where
     {
         T<:AbstractFloat,
     } 
+    ft = s.fid
+    if isempty(ft) & give_processed_fid 
+        @warn "Spectrum $(s.expno) - No fid to transform. Inverting the default processed data."
+        return complex(s.procs[s.default_proc]), ifft(s.procs[s.default_proc])
+    elseif isempty(ft) !give_processed_fid
+        @warn "Spectrum $(s.expno) - No FID to transform. Returning the default processed data."
+        return complex(s.procs[s.default_proc])
+    end
+        
     dims = s["FnMODE"] ≥ 2 ? [1, 2] : [1]
     k = get_DSF_offset(s)    
+    chunk = round(Int, s["TD"] / 8)
     # If there is a residual first-order phase offset from the DSP shift, add this to the 
     # given ϕ₁.
     if !iszero(k % 1)
-        ϕ₁ += (k % 1) * 360 * size(ft, 1) / ( 2s["SW"] * s["SFO1"] )
+        ϕ₁ += (k % 1) * 360 * s["SI"] / ( 2s["SW"] * s["SFO1"] )
         k = floor(Int, k)
+    end
+    for fₖt in eachfibre(ft)
+        # centre the noise at zero, ie. correct for a baseline offset, iff. ∃
+        fₖt .-= mean(fₖt[chunk:end])
+
+        # scale by the noise-per-scan
+        # this should correct for some DSP artefacts so that signal correctly 
+        # scales as √N scans.
+        noise = mean(abs, fₖt[chunk:end]) / √s["NS"]
+        fₖt ./= noise
     end
     # apply the default zero filling
     ft = zero_fill(s) |> gpu
-    plan = plan_fft(ft, dims)
-    fs = fft(circshift(ft, k))
+    # fourier transform the FID
+    fs = circshift(ft, k)
+    fs = fft(fs, dims)
     fs = fftshift(fs, 1)
     # Apply the phase correction in f1, only.
     for fₖs in eachfibre(fs)
         ϕ_correct!(fₖs, ϕ₀, ϕ₁)
     end
     # return the transformed ft.
-    return fs
+    if give_processed_fid
+        return fs, ft
+    else
+        return fs
+    end
 end
 
 # Fourier transform a fid and apply an analytical first order phase offset 

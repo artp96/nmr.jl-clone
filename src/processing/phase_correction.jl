@@ -52,47 +52,33 @@ function ϕ_correct(s::V, ϕ₀=0., ϕ₁=0.) where { C <: Complex, V <: CuVecto
 end
 =#
 """
-    auto_ϕ_correct(s :: V; 
-            f :: Function = (y -> sum(y[y .< 0.].^2)), 
-                        ϕ₀:: T = 0.,
-                        ϕ₁ :: T = 0.,
-                        tol = 1e-3,
-                        pivot_ppm = false
-                        ) where {
-            T <: AbstractFloat,
-            C <: Complex, 
-            V <: AbstractVector{C}
-            }
+    auto_ϕ_correct(s :: V, idxs = (idx1, idx2); kwargs...) -> s; ϕ₀, ϕ₁; optimization
 -------------------------------------------------------------------------------------------
 Automatic phase correction function to take a 1-D spectrum and apply zeroth and 
 first order phase corrections ϕ₀, ϕ₁. 
+Kwargs:
+- cost=Function : Loss function for optimisation, must be defined such that
+f {|v ∈ ℂᴺ, p ∈ ℜ¹, f(v,p)| ->|ε ≥ 0 ∈ ℝ¹|}, where p is a regularisation parameter (if used) 
+- ϕ₀::T <: AbstractFloat :
+- ϕ₁::T <: AbstractFloat :
+ p=1e-5 <: AbstractFloat : regularisation parameter, C must accept p but may ignore it.
+ force_global = false    :  
 """
 function auto_ϕ_correct(s :: V, idxs; 
-            f :: Function = _imag_loss, 
-                        ϕ₀:: T = 0.,
-                        ϕ₁ :: T = 0.,
-                        tol = 1e-3,
+            cost :: Function = _imag_loss,
+                         p = 1e-5,
+                         ϕ₀:: T = rand(),
+                         ϕ₁ :: T = rand(),
                         ) where {
             T <: AbstractFloat,
             C <: Complex, 
             V <: AbstractVector{C}
             }
     idx1, idx2 = idxs
-    s_ = @view s[idx1:idx2]
-    # Must meet criteria for OptimizationFunction, AutomaticDifferentiable
-    function objective(ϕ, s_)
-        ϕ₀, ϕ₁ = ϕ
-        y = ϕ_correct(s_, ϕ₀, ϕ₁) |> real
-        # f can be any loss function, but we seek positive phase for Re(s)
-        return f(y)
-    end
-
-    ϕ = [ϕ₀, ϕ₁]    
-    optF = OptimizationFunction(objective, AutoForwardDiff())
-    prob = OptimizationProblem(optF, ϕ, s)
-    ϕ_opt = solve(prob, BFGS()) .% 360
-    s = ϕ_correct(s, ϕ_opt[1], ϕ_opt[2])
-    return s, ϕ_opt
+    ψ = @view s[idx1:idx2]
+    init = [ϕ₀, ϕ₁] 
+    f(init) = -sum(cost(ψ, init[1], init[2], p))
+    return optimize(f, init, NelderMead(); kwargs...)
 end
 
 
@@ -403,7 +389,7 @@ function angle_zero_correct(ψ::A) where {C<:Complex,A<:AbstractArray{C}}
 end
 
 import DSP: unwrap, unwrap!
-rel(v) = v./maximum(abs.(v)) |> real |> cpu
+rel(v) = cpu(v)[10:end-10]./maximum(abs.(v)) |> real |> cpu
 # convenience method
 full_angle_correction(w::W; kwargs...) where W<:WrappedSpectrum = full_angle_correction(w.fs, w["SW"], w["SFO1"], w["O1"]; kwargs...)
 
@@ -423,7 +409,7 @@ function full_angle_correction(ψ::A, sw, sf, o1; debug = false) where {C<:Compl
     # get weights as the real signal in the data, 
     w = abs.(ψ)
     # find the pivot ν₀ as the point where the cumulative phase offset is greatest
-    # - after this point
+    # - after this point, the first order correction changes sign
     phmax, ν₀ = findmax(abs.(ϕ))
     
     # get the max with sign
@@ -438,8 +424,8 @@ function full_angle_correction(ψ::A, sw, sf, o1; debug = false) where {C<:Compl
         lines!(ax, rel(ϕ), label = "|ϕ|", linestyle = :dash, linewidth = 1)
         lines!(ax, rel(cpu(ϕ₁) ./ cpu(ϕ)[2:end]), label = "Δϕ / |ϕ|", linestyle = :dash, linewidth = 1)
         lines!(ax, rel(ϕ₁), label = "Δϕ", linestyle = :dash, linewidth = 1)
-        lines!(ax, filter!( ϕₖ -> -Inf<ϕₖ<Inf, rel(Φ₁ |> cpu) ), label = "∂ϕ", linestyle = :dash, linewidth = 1)
-        f[1,2] = Legend(f, ax, "feature", framevisible = false)
+        lines!(ax, filter!( ϕₖ -> -Inf < ϕₖ < Inf, rel(Φ₁ |> cpu) ), label = "∂ϕ", linestyle = :dash, linewidth = 1)
+        f[1, 2] = Legend(f, ax, "feature", framevisible = false)
         resize_to_layout!(f)
         return f, ϕ, ϕ₁, Φ₁
     end

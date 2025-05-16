@@ -3,8 +3,8 @@ using NMR, GLMakie, CairoMakie
 GLMakie.activate!()
 import NMR: SFO1, GMAX
 
-datapath = joinpath(homedir(), "nmrdata/data/2025/b300b10/20250430/b300b10")
-data = multiwrap(datapath)
+datapath_300 = joinpath(homedir(), "nmrdata/data/2025/b300b10/20250430/b300b10")
+data_300 = multiwrap(datapath_300)
 #const Dpath = joinpath(homedir(), "nmrdata/data/2025/b800mib/20250423-nug/5")
 #dosydata = BrukerSpectrum(Dpath)
 

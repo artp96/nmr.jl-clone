@@ -11,7 +11,7 @@ struct fibreIterator{T, N}
     max :: Int
     fibres :: Slices
     function fibreIterator(arr :: AbstractArray{T, N}, dim::Int) where {T, N} 
-        any(size(arr) .== 0) && Throw(ArgumentError("At least one dimension of $arr is empty! \nsize = $(size(arr))."))
+        any(size(arr) .== 0) && throw(ArgumentError("At least one dimension of $arr is empty! \nsize = $(size(arr))."))
         max = prod(size(arr)) ÷ size(arr, dim)
         slice_dims = filter( d -> d != dim, ntuple(identity, ndims(arr)) )
         fibres = eachslice(arr; dims = slice_dims)

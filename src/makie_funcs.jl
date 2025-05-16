@@ -236,9 +236,8 @@ function lines(V::P, kind::Function = real;
         # no reason not to fix this here.
         idx1, idx2 = idx1 > idx2 ? (idx2, idx1) : (idx1, idx2)
     end
-    xaxis = axis_func(p)[idx1:idx2] 
+    xaxis = reverse(axis_func(p))[idx1:idx2] 
     xticks = round.([getindex(xaxis, i) for i ∈ round.(Int, LinRange(1, idx2-idx1, 10) )]; digits = 3)
-
 
     fig = Figure()
     ax = Axis(fig[1, 1], title = title, xlabel = string(axis_func)[1:end-4], ylabel = string(kind), xticks = xticks)
@@ -253,7 +252,7 @@ function lines(V::P, kind::Function = real;
             idx1, idx2 = idx1 > idx2 ? (idx2, idx1) : (idx1, idx2)
         end
 
-        xaxis = axis_func(p)[idx1:idx2] 
+        xaxis = reverse(axis_func(p))[idx1:idx2]
 
         # complex mode needs a bit more setup
         if (kind != complex)
@@ -271,12 +270,12 @@ function lines(V::P, kind::Function = real;
             lines!(ax, xaxis, sig,
                 colormap = colormap,
                 linestyle = LINESTYLES[iter],
-                linewidth = 1,
+                linewidth = 0.4,
                 label = labels[i]
                )
         end
     end
-
+    ax.xreversed = true
     ax.xticklabelrotation = -π/6
     ax.xticklabelsize = 14
     ax.xticklabelalign = (:left, :center)

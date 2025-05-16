@@ -60,6 +60,14 @@ function integrate(s::BrukerSpectrum, ref_rng::Int)
 end
 
 integrate(s::BrukerSpectrum, δ::Float64) = integrate(s, find_rng(s, δ))
+
+#integrate(w::WrappedSpectrum, rng::UnitRange, kind = real) = 
+
+function integrate(w::WrappedSpectrum, ppm_range::Tuple{Float64,Float64}, kind = real)
+    r1 = ppmtoindex(w, ppm_range[1])
+    r2 = ppmtoindex(w, ppm_range[2])
+    return sum(kind(w)[r1:r2])
+end
 ###########################################################################
 
 
@@ -85,3 +93,8 @@ end
 
 intensity(s::BrukerSpectrum, δ::Float64) = intensity(s, find_rng(s, δ))
 
+function intensity(w::WrappedSpectrum, ppm_range::Tuple{Float64,Float64}, kind = real)
+    r1 = ppmtoindex(w, ppm_range[1])
+    r2 = ppmtoindex(w, ppm_range[2])
+    return maximum(kind(w)[r1:r2])
+end

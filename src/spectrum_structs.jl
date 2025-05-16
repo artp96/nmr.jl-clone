@@ -349,6 +349,7 @@ parameter. Modified parameters are stored in the params dict.
     s[i], s[i:j], s[(i,j,k...)], s[:]; i,j,k ∈ ℕ  -> s.src[... (idx)]
     s[a], s[a:b], s[(a,b,c...)];      a,b,c ∈ f64 -> s.src[... (ppm)]
     s["par"]                                      -> s.src["par"]
+The FID is scaled by dividing by the noise level.
 """
 mutable struct WrappedSpectrum{
     C<:Complex,
@@ -377,14 +378,11 @@ end
 """ WrappedSpectrum(s::BrukerSpectrum)
 -------------------------------------------------------------------------------------------
 Outer constructor to wrap a Bruker expno, transforming the FID and storing FFT coeffs.
-By default, stores on the GPU if available."""
+By default, stores on the GPU if available.
+Scales the data by the noise level, assuming the last 12.5% of the FID is purely noise.
+"""
 function WrappedSpectrum(src::BrukerSpectrum)
-    # get the structure of the FID - 2D, or pseudo-2D
-    #dims = range(1, ndims(src.fid)) |> collect
-    #dims = src["FnMODE"] ≥ 2 ? dims : dims[1:end]
-    dims = src["FnMODE"] ≥ 2 ? [1, 2] : [1]
-    ft = gpu(zero_fill(src.fid, src["SI"]))
-    fs = fft(src)
+    fs, ft = fft(src; give_processed_fid = true)
     return WrappedSpectrum(src.name, ft, fs, src, src.expno)
 end
 

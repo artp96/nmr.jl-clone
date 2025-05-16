@@ -2,6 +2,7 @@ module NMR
 
 """γₚ, ¹H gyromagnetic ratio in MHz T⁻¹. """
 const γₚ = 42.577478461 
+const dpath = joinpath(homedir(), "nmrdata/data/2025")
 
 using DataFrames 
 using DSP # Digital Signal processing
@@ -16,6 +17,7 @@ using Optimization
 using Optim
 using ProgressBars
 using Statistics
+using StatsBase
 using RecipesBase
 
 using CUDA
