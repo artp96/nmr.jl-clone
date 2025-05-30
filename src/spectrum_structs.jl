@@ -230,12 +230,15 @@ Outer constructors should be used to get all the variables from a popt file.
         plan = plan_fft(ser, [1])
         
         
-        return new{T, C, A}(plan, a, p, e, n, fpath, vars, ser, proc)
+        ft = plan_fft(ser, [1])
+        
+        
+        return new{T, C, A}(ft, a, p, e, n, fpath, vars, ser, proc)
     end
 end
 
 import FFTW: fft
-fft(s :: P) where P <:  PoptSpectrum = s.plan * s.ser
+fft(s :: P) where P <:  PoptSpectrum = s.ft * s.ser
 
 """
     PoptSpectrum(f :: V, a :: Dict{S, Any}, p :: Int, e:: Int,  n :: S, fp :: S, prot :: DF, ser :: V, proc :: P) where {

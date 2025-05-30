@@ -12,11 +12,11 @@ tsts = Dict(d.src.expno => cpu!(d) for d in data[2:5])
 
 import NMR.full_angle_correction
 
-fig0, p_0, dp0, Dp0 = full_angle_correction(tsts[11]; debug = true)
+s = tsts[5]
+fig0, p_0, dp0, Dp0 = full_angle_correction(s; debug = true)
 
 import NMR.auto_ϕ_correct_3
-
-opt1 = auto_ϕ_correct_3(tsts[11], rand(), rand(), 1e-6)
-try1 = lines(ϕ_correct(tsts[11].fs, opt1.minimizer...)|>real)
+opt1 = auto_ϕ_correct_3(s, rand(), rand(), 1e-6)
+try1 = lines(ϕ_correct(s.fs, opt1.minimizer...)|>real)
 
 #fig1 = lines(out)

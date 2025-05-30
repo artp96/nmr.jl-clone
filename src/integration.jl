@@ -3,7 +3,6 @@ intrng(s::BrukerSpectrum) = s[s.default_proc].intrng
 intrng(p::PoptSpectrum) = p.proc.intrng
 intrng(w::WrappedSpectrum) = intrng(w.src)
 
-
 function intrng_indices(s::BrukerSpectrum)
     rng = intrng(s)
     [ppmtoindex(s,i[1]):ppmtoindex(s,i[2]) for i in rng]

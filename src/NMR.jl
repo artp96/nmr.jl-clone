@@ -6,6 +6,15 @@ const dpath = joinpath(homedir(), "nmrdata/data/2025")
 
 using DataFrames 
 using DSP # Digital Signal processing
+using ProgressBars
+using DataFrames 
+using GLMakie; GLMakie.activate!()
+using LaTeXStrings
+using Interpolations
+using LinearAlgebra: norm, normalize, dot
+using Statistics
+using RecipesBase
+using FFTW
 using FastTransforms
 using FFTW
 using ForwardDiff
