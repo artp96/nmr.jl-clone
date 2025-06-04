@@ -1,4 +1,4 @@
-module NMR
+module NMR_acp
 
 """γₚ, ¹H gyromagnetic ratio in MHz T⁻¹. """
 const γₚ = 42.577478461 

@@ -1,9 +1,9 @@
 using NMR, GLMakie
-using BenchmarkTools
+
 g, Gmax = 0.2, 67.
 fpath  = joinpath(homedir(), "nmrdata/data/2025/b500b07/250411")
 
-S = [Spectrum(joinpath(fpath, s), 1) for s in string.(10:20)]
+S = [BrukerSpectrum(joinpath(fpath, s), 1) for s in string.(10:20)]
 s = S[1]
 p = s[1]
 

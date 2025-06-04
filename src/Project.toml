@@ -1,4 +1,10 @@
+name = "NMR_acp"
+uuid = "9fb00f2c-ab19-4f85-9493-37466a8ec4e2"
+version = "0.2.0"
+
 [deps]
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 NMR = "ccd5ae15-cd25-53ab-b4f2-e0ae14ef09d4"
+ProgressBars = "49802e3a-d2f1-5c88-81d8-b72133a6f568"
 ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
