@@ -1,8 +1,7 @@
 using NMR
 using GLMakie
 using BenchmarkTools
-using StatsBase
-using Debugger
+#using StatsBase
 
 const dpath = joinpath(homedir(), "nmrdata/data/2025/b300b10/20250430/b300b10")
 const imported = multiimport(dpath)

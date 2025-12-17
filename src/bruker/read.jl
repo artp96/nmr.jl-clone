@@ -7,10 +7,13 @@ function read_bruker_binary(fname)
     reinterpret(Int32, open(read, fname))
 end
 
-function parse_float_list(m)
-    lines = split(m)
+function clean_match(s)
+    strip(replace(s, r"[()\"]" => ""))
+end
+function parse_list(T::Type, m)
+    lines = filter(!isempty,clean_match.(split(m)))
     # The first line of a match is "(0..n)"; we don't need this.
-    [parse(Float64, s) for s in split(m)[2:end]]
+    [parse(T, s) for s in lines[2:end]]
 end
 
 function parse_or(::Type{T}, s, default::T) where T
@@ -18,37 +21,66 @@ function parse_or(::Type{T}, s, default::T) where T
     v === nothing ? default : v
 end
 
-#TODO: Make const
-#const
-filters = [ ( Set(["SW", "SW_h", 
-    "O1", "O2", "O3", 
-    "SFO1", "SFO2", "SFO3", "SF", 
-    "BF1", "BF2", "BF3", 
-    "PHC0", "PHC1", "LB", 
-    # GRPDLY / DSP Variables.
-    "GRPDLY", "DSPFVS", "DECIM"]),
-              s -> parse(Float64, s) ),
-            ( Set(["TD","TD0", "NS", "DS", "SI", "NC", "NC_proc",
-                "FnMODE",]),
-              s -> parse(Int, s) ),
-            ( Set(["D", "P", "GPX", "GPY", "GPZ", "CNST"]),
-              parse_float_list),
-            ( Set(["PULPROG"]),
-              x -> strip(x)[2:end-1] ),
-            ( Set(["AUTOPOS"]),
-              x -> parse_or(Int, strip(x)[2:end-1], 0) )
+const filters = [ 
+    (
+        Set(["SW", "SW_h", 
+        "O1", "O2", "O3", "O4",
+        "SFO1", "SFO2", "SFO3", "SFO4", 
+        "SF",
+        "BF1", "BF2", "BF3", 
+        "PHC0", "PHC1", "LB", 
+        # GRPDLY / DSP Variables.
+        "GRPDLY", "DSPFVS", "DECIM",
+        "DWELL", "DE", "TE", "NusAMOUNT"]),
+        s -> parse(Float64, clean_match(s)) 
+    ),
+
+    # Int64eger parameters, such as number of scans, and some enum keys
+    (
+        Set(["TD","TD0", "NS", "DS", "SI", "NC", "NC_proc",
+        "FnMODE", "SEOUT"]),
+        s -> parse(Int, clean_match(s) ) 
+    ),
+    # Lists of floating point numbers, such as pulse-specific parameters
+    (
+        Set(["D", "P", "GPX", "GPY", "GPZ", "CNST", "SPW", "SPDB", "PLW",
+    "PLDB", "SPOFFS", "SPOAL"]),
+        s -> parse_list(Float64, s) 
+    ),
+    ( 
+        Set(["TD_INDIRECT"]),
+        s -> parse_list(Int, s) 
+    ),
+    # Pulse program name
+    ( 
+        Set(["PULPROG"]),
+        x -> strip(x)[2:end-1] 
+    ),
+    ( 
+        Set(["AUTOPOS"]),
+        x -> parse_or(Int64, strip(x)[2:end-1], 0) 
+    ),
+    ( 
+        Set(["SPNAM", "GPNAM"]),
+        x -> parse_or(Int64, strip(x)[2:end-1], 0) 
+    )
 ]
 
 function read_params(file)
     contents = read(file, String)
+    res = Dict{String, Any}()
     matches = eachmatch(r"##\$?(.*?)=\s?([^#]+)"s, contents)
-    res = Dict(string(m.captures[1]) => parse_param(m.captures[1], m.captures[2]) for m in matches)
+    for m in matches
+        parsed = parse_param(m.captures[1], m.captures[2])
+        res[string(m.captures[1])] = parsed
+    end
 
     # a few little tweaks
     if "O1" in keys(res) && !("O1P" in keys(res))
         res["O1P"] = res["O1"] / res["SFO1"]
     end
-    res
+    return res
+    # return an empty dict if the file isn't found.
 end
 
 function read_intrng(file)
@@ -66,42 +98,81 @@ function read_intrng(file)
     end
 end
 
-function parse_param(param, val)
+function parse_param(param, val, filters = filters)
     for (names, fun) in filters
-        if param in names
-            return fun(val)
-        end
+         param in names && return fun(val)
     end
     return strip(string(val))
 end
 
-function ProcessedSpectrum(path :: AbstractString, procno :: Int)
+function ProcessedSpectrum(path :: AbstractString, procno :: Int; no_proc_data = true)
     
-    params = read_params(joinpath(path, "proc"))
+    params = read_params(joinpath(path, "procs"))
     
-    if "1r" in readdir(path)
-        (r,i) = ("1r", "1i")
-    elseif "2rr" in readdir(path)
-        (r,i) = ("2rr", "2ii")
+    re_ft = im_ft = Float64[]
+    # if skipping import of procnos
+    if no_proc_data
+        @info "Skipping import of procno spectrum."
     else
-        @error "No 1r or 2rr file found for $procno \n (at $path)."
-    end
-        re_ft = read_bruker_binary(joinpath(path, r)) .* 2^params["NC_proc"]
-
-    im_ft = zeros(size(re_ft))
-    try 
-        im_ft = read_bruker_binary(joinpath(path, i)) .* 2^params["NC_proc"]
-    catch e
-        @info "$path has no imaginary part."
+        if "1r" in readdir(path)
+            (r,i) = ("1r", "1i")
+            _err = ""; # empty string
+        elseif "2rr" in readdir(path)
+            (r,i) = ("2rr", "2ii")
+            _err = ""
+        else
+            _err = "No 1r or 2rr file found for $procno \n (at $path)."
+        end
+        try 
+            re_ft = read_bruker_binary(joinpath(path, r)) .* 2^params["NC_proc"]
+        catch e
+            @info "Procno $path not readable. \n $_err"
+        end
+        try 
+            im_ft = read_bruker_binary(joinpath(path, i)) .* 2^params["NC_proc"]
+        catch e
+            @info "$path has no imaginary part."
+        end
     end
     scale_correction = params
     title = read(joinpath(path, "title"), String)
     intrng = read_intrng(joinpath(path, "intrng"))
     @debug println(intrng)
-    return NMR.ProcessedSpectrum(float(re_ft), float(im_ft), params, intrng, procno, title)
+    return ProcessedSpectrum(float(re_ft), float(im_ft), params, intrng, procno, title)
 end
 
-ProcessedSpectrum(path::AbstractString) = ProcessedSpectrum(path, parse(Int, basename(path)))
+ProcessedSpectrum(path::AbstractString; kwargs...) = ProcessedSpectrum(path, parse(Int, basename(path)); kwargs...)
+
+"""
+merge_acqus([dict1, dict2, ...]) -> dict
+----------------------------------------------------------------------------------
+Function to merge acquisition parameter dicts. Most of the useful stuff is in 
+acqu1, including TD_INDIRECT, but NUS parameters are stored in each acquNs file.
+Appends a dimension-specific number to keys in acqu2, acqu3, etc. but not to keys 
+in acqu1. 
+    acqus["TD"] -> acqus["TD"]
+    acqu2s["TD"] -> acqus["TD2"]
+"""
+function merge_acqus!(acqu, acquN::Vector{D}) where D<:Dict
+    for (n, d) in enumerate(acquN)
+        for k in keys(d)
+            if k ∉ keys(acqu) 
+                acqu[k] = d[k]
+            else
+                newkey = join([k string(n)])
+                acqu[newkey] = d[k]
+            end
+        end
+    end
+    return acqu
+end
+merge_acqus(acquN::Vector{D}) where D<:Dict = merge_acqus!(similar(acquN[1]), acquN[1:end])
+
+"""
+    Compute the dimension of the data for reshape(). The TD2 dimension is implicitly zero filled 
+    once due to serial acquisition of re,im,re data in Bruker format.
+"""
+get_ser_dims(D::Dict)::Tuple = (2D["TD2"], filter(!iszero, D["TD_INDIRECT"])...)
 
 """
    BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
@@ -112,16 +183,25 @@ procpars can be accessed using dict indexing, e.g.
     - s["TD"] -> Number of points in the FID, an acqupar.
     - s["LB"] -> Line broadening applied, Hz, a procpar.
 """
-BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int) = begin
+BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int; no_proc_data = false) = begin
     # below, changed joinpath to omit "fid", can't find this anywhere ?
     # fid = float(read_bruker_binary(path))
-    acqu = read_params(joinpath(path, "acqus"))
+    acqu_files = filter(!isnothing, match.(r"acq.+s", readdir(path)))
+    # get higher-dimensional acqus and merge them into a single acqus
+    acqu = Dict{String, Any}()
+    merge_acqus!(acqu, [read_params(joinpath(path, aq.match)) for aq ∈ acqu_files])
     
-    fid = zeros(acqu["TD"])
     if "fid" in readdir(path)
-        fid = float(read_bruker_binary(joinpath(path, "fid"))) 
+        TD = acqu["TD"]
+        fid = zeros(TD) 
+        fid = float(read_bruker_binary(joinpath(path, "fid"))) |> gpu!
+        fid = split_fid(fid)
+        fid = sparsevec(fid)
     elseif "ser" in readdir(path)
         fid = float(read_bruker_binary(joinpath(path, "ser"))) 
+        fid = split_fid(fid)
+        fid = collect(reshape(fid, get_ser_dims(acqu)))
+        fid = zero_fill(fid, fill(2, ndims(fid)))
     else
         @error "No 'fid' or 'ser' found in $path."
     end
@@ -133,11 +213,11 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
     # Julia's basename function will not work if the path ends in a trailing slash
     if isempty(expno)
         @warn "Julia's main.basename() returns empty if path ends in \"/\". 
-              \n Check the path variable ends in the expno, an integer."
+              \n Check the path variable ends in the expno, an integer character."
         expno = basename(path[1:end-1])
-        expno = parse(Int,expno) 
+        expno = parse(Int, expno) 
     else        
-        expno = parse(Int,expno) 
+        expno = parse(Int, expno) 
     end
 
     # Needs to be instantiated correctly
@@ -145,12 +225,12 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
 
     for procno in procnos
         proc_path = joinpath(path, "pdata", string(procno))
-        procs[procno] = ProcessedSpectrum(proc_path, procno)
+        procs[procno] = ProcessedSpectrum(proc_path, procno; no_proc_data = no_proc_data)
     end
    BrukerSpectrum(fid, acqu, procs, default_proc, name, expno)
 end
 
-BrukerSpectrum(path :: AbstractString, procno :: Int) = BrukerSpectrum(path, [procno], procno)
+BrukerSpectrum(path :: AbstractString, procno :: Int; kwargs...) = BrukerSpectrum(path, [procno], procno; kwargs...)
 
 
 """
@@ -162,7 +242,7 @@ procpars can be accessed using dict indexing, e.g.
     - s["TD"] -> Number of points in the FID, an acqupar.
     - s["LB"] -> Line broadening applied, Hz, a procpar.
 """
-function BrukerSpectrum(path :: AbstractString; interactive = true)
+function BrukerSpectrum(path :: AbstractString; interactive = true, kwargs...)
     procpath = joinpath(path, "pdata")
     procnos = parse.(Int, readdir(procpath))
     if !interactive || length(procnos) == 1
@@ -175,7 +255,7 @@ function BrukerSpectrum(path :: AbstractString; interactive = true)
     BrukerSpectrum(path, procnos, default_proc)
 end
 
-BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}) = BrukerSpectrum(path, procnos, minimum(procnos))
+BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}; kwargs...) = BrukerSpectrum(path, procnos, minimum(procnos); kwargs...)
 
 
 """
@@ -186,13 +266,13 @@ Import an array of Bruker spectra from a folder as WrappedSpectrum.
 - givemissing : Optionally keep the indices of files which 
 could not be imported as v[idx] = "missing".
 """
-function multiimport(fpath::AbstractString; givemissing = false) 
+function multiimport(fpath::AbstractString; givemissing = false, kwargs...) 
     N = readdir(fpath)
     data = Vector{Union{Missing, BrukerSpectrum}}(undef, length(N))
     fill!(data,missing)
     Threads.@threads for i in eachindex(data)
         try       
-            data[i] = BrukerSpectrum(joinpath(fpath, N[i]); interactive = false)
+            data[i] = BrukerSpectrum(joinpath(fpath, N[i]; kwargs...); interactive = false)
         catch e
             println("Could not parse expno $(N[i]):\n$e.")
         end

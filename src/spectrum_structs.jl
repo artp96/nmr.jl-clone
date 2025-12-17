@@ -1,9 +1,10 @@
+import Base.complex, Base.imag, Base.real
 # Some utilities
 const S = String
-"Integration range in the frequency domain, values given in ppm."
+#Integration range in the frequency domain, values given in ppm."
 const Intrng{T} = Tuple{T, T} where T <: AbstractFloat
 
-import Base.complex, Base.imag, Base.real
+
 
 """
     Abstract Supertype of spectrum structs.
@@ -90,8 +91,8 @@ Following Bruker convention:
 - **name**: Experiment name
 - **expno**: Experiment number if, e.g., part of a Bruker dataset
 """
-struct BrukerSpectrum{C <: Complex, V <: AbstractVector{C}, P <: ProcessedSpectrum}  <: AbstractSpectrum
-    fid :: V
+struct BrukerSpectrum{A <: ℂᴺ, P <: ProcessedSpectrum}  <: AbstractSpectrum
+    fid :: A
     acqu :: Dict{String, Any}
     procs :: Dict{Int, P}
     default_proc :: Int
@@ -100,21 +101,20 @@ struct BrukerSpectrum{C <: Complex, V <: AbstractVector{C}, P <: ProcessedSpectr
         
 end
     # Outer constructor to handle weakly typed dicts & split the "Real" FID.
-function BrukerSpectrum(f :: V, a :: Dict{S, Any}, p :: Dict{I, P}, d :: I, n :: String, e :: I) where {
+function BrukerSpectrum(v :: V, a :: Dict{S, Any}, p :: Dict{I, P}, d :: I, n :: String, e :: I) where {
 # Type-fu is intensifying #
-        T <: AbstractFloat, 
-        V <: AbstractVector{T}, 
-        P <: ProcessedSpectrum{T, V}, 
+        V <: ℝ¹, 
+        P <: ProcessedSpectrum, 
         S <: AbstractString, 
         I <: Int}
         # process the FID, {ℝ, ℝ} -> ℂ
-        f = split_fid(f)  # Ensure that the transformed FID is of the correct type
-        if !(f isa AbstractVector{<: Complex})
+        v = split_fid(v)  # Ensure that the transformed FID is of the correct type
+        if !(v isa AbstractVector{<: Complex})
             throw(ArgumentError("The split FID must be of type AbstractVector{$C}, but got $(typeof(f))"))
         end
-        W = typeof(f)
+        W = typeof(v)
         # Copy the acqupars into each procno
-        s = BrukerSpectrum(f, a, p, d, n, e)
+        s = BrukerSpectrum(v, a, p, d, n, e)
         ParamDict(s)
         return s
 end
@@ -288,15 +288,22 @@ May not act correctly if the procno is not a popt procno!
 synthesize_ser(s :: S) where S <: ProcessedSpectrum = s.re_ft + base.im * s.im_ft
 
 """
-    split_fid(fid :: V) where {V <: AbstractVector}
-
+split_fid(fid :: V{ℝ}) where {V <: AbstractVector, ℝ<:Real} 
 Split a fresh FID into it's real and complex parts.
-N-D spectra are still acquired time-domain sequentially, so this should work for all N-D spectra?
+N-D spectra are still acquired time-domain sequentially, so this should work for all N-D spectra.
+Effectively applies the default zero-filling value of 2x in the fid dimension.
 """
-function split_fid(fid :: V) where V <: AbstractVector
+function split_fid(fid :: V) where V <: ℝ¹
     fid = complex(fid)
-    fid[1:2:end] .+= 1im * fid[2:2:end]
-    return fid[1:2:end]
+    fid[1:2:end] .-= 1im * fid[2:2:end]
+    fid[2:2:end] .-= fid[2:2:end]
+    return fid
+end
+function split_fid(fid :: CV) where CV <: CuVector{<:f64}
+    fid = complex(fid)
+    fid .-= 1im * circshift(fid, -1)
+    fid .-= circshift(fid, -1)
+    return fid
 end
 
 """
@@ -354,11 +361,7 @@ parameter. Modified parameters are stored in the params dict.
     s["par"]                                      -> s.src["par"]
 The FID is scaled by dividing by the noise level.
 """
-mutable struct WrappedSpectrum{
-    C<:Complex,
-    A<:AbstractArray{C, N}
-    where N 
-    } <: AbstractSpectrum
+mutable struct WrappedSpectrum{A<:ℂᴺ} <: AbstractSpectrum
     name :: S where S <: AbstractString
     ft :: A # time domain data
     fs :: A # freq domain data
@@ -369,12 +372,10 @@ mutable struct WrappedSpectrum{
     expno :: Int64
     # Inner constructor method which re-gets dimstate
     function WrappedSpectrum(n::String,ft::A,fs::A,src::B,e::Int64) where {
-        C <: Complex,
-        A <: AbstractArray{C, N} where N,
-        B <: BrukerSpectrum,
+    A<:ℂᴺ, B <: BrukerSpectrum
     }
         # get the structure of the FID - 2D, or pseudo-2D
-        new{C, A}(n, ft, fs, src, Dict{String,Any}(), e)
+        new{A}(n, ft, fs, src, Dict{String,Any}(), e)
     end
 end
 

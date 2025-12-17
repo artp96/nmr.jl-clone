@@ -32,13 +32,13 @@ const GMAX = Dict{String, NamedTuple}(
 function to compute the size of a slice from a given gradient amplitude and selective pulse bandwidth.
 """ 
 function get_SliceLength(g, δ; 
-                        γ = 42.577478461, # γₚ₊ / 2π, MHz T-1
+                        γ = 2.6752218708e8/2π, # γₚ₊, Hz T-1
                         Gmax = 50, # Gauss cm-1
                         message = true)
     !(0. ≤ g ≤ 1.) && throw(ArgumentError("Applied gradient g should be a relative value 0 ≤ g ≤ 1.")) 
     if g != 0
         G = g * Gmax * 1e-4 # G cm-1 => T cm-1 
-        Γ = γ * G * 1e6 # => MHz cm-1 => Hz cm-1
+        Γ = γ * G  # => Hz T-1 => Hz cm-1
         l = δ / Γ # => Hz / (Hz cm-1) = cm
         ℓ = round(l, sigdigits = 3) # prettier
         message && println("\n 

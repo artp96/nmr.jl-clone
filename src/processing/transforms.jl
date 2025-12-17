@@ -4,7 +4,12 @@ structures.
 =#
 
 using AbstractFFTs: Plan
-import FFTW: fft, ifft, plan_fft,  plan_ifft
+import FFTW: fft, ifft, plan_fft,  plan_ifft, fft!, ifft!
+
+# The FT of a sparse array is in general not sparse, and certainly does not have the 
+# sparsity structure of the sparse input. So we can allocate the output based on a 
+# de-densified input, and fft that.
+fft(a::A, args...) where A<:𝕊ᴺ = fft(dense!(a), args...)
 
 todo = !ismissing("yes!")
 
@@ -18,10 +23,7 @@ Optionally, pass a specific array as fid to test the processing associated with 
 fft(s::S) where S<:AbstractSpectrum = fft(s, s["PHC0"], s["PHC1"])
 fft(w::W; ft::A=w.ft) where {W<:WrappedSpectrum,A<:AbstractArray} = fft(w, w["PHC0"], w["PHC1"]; ft=ft)
 
-function fft(w::WrappedSpectrum, ϕ₀::T, ϕ₁::T; ft=w.ft) where 
-    {
-    T<:AbstractFloat,
-    } 
+function fft(w::WrappedSpectrum, ϕ₀::f64, ϕ₁::f64; ft=w.ft) where 
     k = get_DSF_offset(w.src)
     # If there is a residual first-order phase offset from the DSP shift, add this to the 
     # given ϕ₁.
@@ -41,9 +43,9 @@ end
 
 # fft the FID of a Bruker Spectrum, returning the spectrum and plan used. Applies
 # default zero filling based on SI and phase correction based on PHC0/1.
-function fft(s::BrukerSpectrum, ϕ₀::T=s["PHC0"], ϕ₁::T=s["PHC1"]; give_processed_fid = false) where
+function fft(s::BrukerSpectrum, ϕ₀::T=s["PHC0"], ϕ₁::T=s["PHC1"]; give_processed_fid = false) 
     {
-        T<:AbstractFloat,
+        T<:f64,
     } 
     ft = s.fid
     if isempty(ft) & give_processed_fid 
@@ -73,8 +75,6 @@ function fft(s::BrukerSpectrum, ϕ₀::T=s["PHC0"], ϕ₁::T=s["PHC1"]; give_pro
         noise = mean(abs, fₖt[chunk:end]) / √s["NS"]
         fₖt ./= noise
     end
-    # apply the default zero filling
-    ft = zero_fill(s) |> gpu
     # fourier transform the FID
     fs = circshift(ft, k)
     fs = fft(fs, dims)

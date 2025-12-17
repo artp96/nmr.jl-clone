@@ -3,32 +3,30 @@
 #
 #
 """
-    exp_window(S, b) -> S
-    - S <: AbstractSpectrum
-    - b is the broadening factor, in Hz.
------------------------------------------------------------------------
-Apply a gaussian broadening function. The true start of acquisition 
-(first non-zero point in the FID) is defined as t₀.
+    Get the fid time indices for each dimension of the fid
 """
-function exp_window(s :: S, b) where S <: BrukerSpectrum
-    b = float(b)
-    dt = s["DW"] 
-    t₀, ϕ₁ = get_DSF_offset(s)
-    t = 1:s["TD"] .- t₀
-    for fid in eachfibre(s.fid)
-            fid .*= exp.( t  * dt / b )
-    end
-    return s
+function get_times(s::BrukerSpectrum) 
+    
+
 end
 
+
 """
-    match_filter(s, f) -> f(s)
-    - S <: AbstractSpectrum
-    - f(S, b) <: Function 
------------------------------------------------------------------------
-Returns an anonymous function compiled and specialised to exactly the 
-spectrum s and matched to the natural linewidth of s which can be simd
-or @. efficiently.
+    apodise!(S, S ∈ ℂᴺ, 𝑓(𝑡₁, 𝑡₂, 𝑡₃...)) -> S ∈ ℂᴺ. 
+--------------------------------------------------------------------
+    Applies the window function 𝑓 to the spectrum. 
+    Window functions are applied to the time domain, before Fourier
+    transform, and should be functions of 𝑡 in each dimension.
+
 """
+function apodise!(out::AS, in::AS, f::Function) where AS<:AbstractSpectrum
+    # Get the time indices    
+    ts = get_times(in)
+    
+
+
+end
+
+
 
 export exp_window, match_filter
