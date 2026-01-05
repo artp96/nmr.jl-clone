@@ -1,7 +1,7 @@
 export intensity, integrate
 intrng(s::BrukerSpectrum) = s[s.default_proc].intrng
 intrng(p::PoptSpectrum) = p.proc.intrng
-intrng(w::WrappedSpectrum) = intrng(w.src)
+intrng(w::FracSpectrum) = intrng(w.src)
 
 function intrng_indices(s::BrukerSpectrum)
     rng = intrng(s)
@@ -60,9 +60,9 @@ end
 
 integrate(s::BrukerSpectrum, δ::Float64) = integrate(s, find_rng(s, δ))
 
-#integrate(w::WrappedSpectrum, rng::UnitRange, kind = real) = 
+#integrate(w::FracSpectrum, rng::UnitRange, kind = real) = 
 
-function integrate(w::WrappedSpectrum, ppm_range::Tuple{Float64,Float64}, kind = real)
+function integrate(w::FracSpectrum, ppm_range::Tuple{Float64,Float64}, kind = real)
     r1 = ppmtoindex(w, ppm_range[1])
     r2 = ppmtoindex(w, ppm_range[2])
     return sum(kind(w)[r1:r2])
@@ -92,7 +92,7 @@ end
 
 intensity(s::BrukerSpectrum, δ::Float64) = intensity(s, find_rng(s, δ))
 
-function intensity(w::WrappedSpectrum, ppm_range::Tuple{Float64,Float64}, kind = real)
+function intensity(w::FracSpectrum, ppm_range::Tuple{Float64,Float64}, kind = real)
     r1 = ppmtoindex(w, ppm_range[1])
     r2 = ppmtoindex(w, ppm_range[2])
     return maximum(kind(w)[r1:r2])

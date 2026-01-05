@@ -1,7 +1,4 @@
 
-using Optimization, ForwardDiff
-using Base: debug_color
-using OptimizationOptimJL
 
 
 """

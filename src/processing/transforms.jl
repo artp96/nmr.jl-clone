@@ -15,15 +15,15 @@ todo = !ismissing("yes!")
 
 """ fft(s <: AbstractSpectrum; f(t) = s.fid) -> ψ ∈ ℂᴺ.
 -------------------------------------------------------------------------------------------
-Forward Fourier transform of an spectrum which calls a specialsed method depending on the 
+Forward Fourier transform of an spectrum which calls a specialised method depending on the 
 spectrum in question. Returns a transformed array, by default phase corrected using the 
 Bruker parameters PHC0 and PHC1 respectively.
 Optionally, pass a specific array as fid to test the processing associated with 's'. 
 """
 fft(s::S) where S<:AbstractSpectrum = fft(s, s["PHC0"], s["PHC1"])
-fft(w::W; ft::A=w.ft) where {W<:WrappedSpectrum,A<:AbstractArray} = fft(w, w["PHC0"], w["PHC1"]; ft=ft)
+fft(w::W; ft::A=w.ft) where {W<:FracSpectrum,A<:AbstractArray} = fft(w, w["PHC0"], w["PHC1"]; ft=ft)
 
-function fft(w::WrappedSpectrum, ϕ₀::f64, ϕ₁::f64; ft=w.ft) where 
+function fft(w::FracSpectrum, ϕ₀::f64, ϕ₁::f64; ft=w.ft)
     k = get_DSF_offset(w.src)
     # If there is a residual first-order phase offset from the DSP shift, add this to the 
     # given ϕ₁.
@@ -42,11 +42,9 @@ function fft(w::WrappedSpectrum, ϕ₀::f64, ϕ₁::f64; ft=w.ft) where
 end
 
 # fft the FID of a Bruker Spectrum, returning the spectrum and plan used. Applies
-# default zero filling based on SI and phase correction based on PHC0/1.
-function fft(s::BrukerSpectrum, ϕ₀::T=s["PHC0"], ϕ₁::T=s["PHC1"]; give_processed_fid = false) 
-    {
-        T<:f64,
-    } 
+# default zero filling based on SI and phase correction based on PHC0/1. 
+# assumes 
+function fft(s::BrukerSpectrum, ϕ₀::T=s["PHC0"], ϕ₁::T=s["PHC1"]; give_processed_fid = false) where T<:ℝ
     ft = s.fid
     if isempty(ft) & give_processed_fid 
         @warn "Spectrum $(s.expno) - No fid to transform. Inverting the default processed data."
@@ -91,17 +89,7 @@ function fft(s::BrukerSpectrum, ϕ₀::T=s["PHC0"], ϕ₁::T=s["PHC1"]; give_pro
     end
 end
 
-# Fourier transform a fid and apply an analytical first order phase offset 
-# to the t₁ dimension in 1 or n-D spectra, based on DSP. 
-# ϕ₀ in °, ϕ₁ in ° Hz⁻¹.
-#=
-function fft(fid :: A, ϕ₀::T = 0.0, ϕ₁::T = 0.0, plan :: P = plan_fft(fid)) where {
-    T <: AbstractFloat,
-    A <: AbstractArray,
-    P <: AbstractFFTs.Plan,
-}
-end
-=# # general formulation may be redundant?  
+
 
 # Bottom-level iffts for containers which hold frequency-domain spectra.
 """ ifft(p <: ProcessedSpectrum) -> f(t)
@@ -111,11 +99,11 @@ Generate an FID from the real and imaginary parts of a processed Bruker spectrum
 ifft(p::P) where P<:ProcessedSpectrum = ifft(ifftshift(complex(p)))
 
 
-""" ifft(W <: WrappedSpectrum) -> f(t)
+""" ifft(W <: FracSpectrum) -> f(t)
 -------------------------------------------------------------------------------------------
 Generate an FID from the real and imaginary parts of an NMR.jl-wrapped spectrum.
 """
-ifft(w::WrappedSpectrum) = ifft(ifftshift(w.s))
+ifft(w::FracSpectrum) = ifft(ifftshift(w.s))
 
 #! TODO fix this / have stateful transforms
 """dimstate(s::AbstractSpectrum) -> [Int]

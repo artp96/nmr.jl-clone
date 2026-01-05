@@ -97,8 +97,7 @@ struct BrukerSpectrum{A <: ℂᴺ, P <: ProcessedSpectrum}  <: AbstractSpectrum
     procs :: Dict{Int, P}
     default_proc :: Int
     name :: String
-    expno :: Int
-        
+    expno :: Int        
 end
     # Outer constructor to handle weakly typed dicts & split the "Real" FID.
 function BrukerSpectrum(v :: V, a :: Dict{S, Any}, p :: Dict{I, P}, d :: I, n :: String, e :: I) where {
@@ -287,24 +286,19 @@ May not act correctly if the procno is not a popt procno!
 """
 synthesize_ser(s :: S) where S <: ProcessedSpectrum = s.re_ft + base.im * s.im_ft
 
-"""
-split_fid(fid :: V{ℝ}) where {V <: AbstractVector, ℝ<:Real} 
-Split a fresh FID into it's real and complex parts.
-N-D spectra are still acquired time-domain sequentially, so this should work for all N-D spectra.
-Effectively applies the default zero-filling value of 2x in the fid dimension.
-"""
-function split_fid(fid :: V) where V <: ℝ¹
-    fid = complex(fid)
-    fid[1:2:end] .-= 1im * fid[2:2:end]
-    fid[2:2:end] .-= fid[2:2:end]
-    return fid
-end
-function split_fid(fid :: CV) where CV <: CuVector{<:f64}
-    fid = complex(fid)
-    fid .-= 1im * circshift(fid, -1)
-    fid .-= circshift(fid, -1)
-    return fid
-end
+
+# function split_fid(fid :: CV) where CV <: CuVector
+#     fid = complex(fid)
+#     fid .-= 1im * circshift(fid, -1)
+#     fid .-= circshift(fid, -1)
+#     return fid
+# end
+# function split_fid_kernel(fid)
+
+    
+#     return nothing # void
+# end
+#
 
 """
     ParamDict(s <: AbstractSpectrum) -> s
@@ -341,74 +335,4 @@ end
 
 #! TODO get this finished
 import AbstractFFTs: AbstractFFTs.Plan
-""" 
-    WrappedSpectrum{T, A} <: AbstractSpectrum
-    - title
-    - t : time domain data, fid/ser
-    - s : frequency domain data (spectrum)
-    - src <: AbstractSpectrum 
-    - fplan : FFTW plan for t -> s transform
-    - iplan : FFTW plan for s -> t transform
--------------------------------------------------------------------------------------------
-A wrapper which stores a raw spectrum file, and modified t and s domain
-data. Initializes by reading in a fid from a BrukerSpectrum and applying
-with no other processing applied (note this includes SI zero filling).
-For convenience, indexing operations are defined to access the frequency
-domain array s by default, or if passed a string, to retrieve a stored 
-parameter. Modified parameters are stored in the params dict.
-    s[i], s[i:j], s[(i,j,k...)], s[:]; i,j,k ∈ ℕ  -> s.src[... (idx)]
-    s[a], s[a:b], s[(a,b,c...)];      a,b,c ∈ f64 -> s.src[... (ppm)]
-    s["par"]                                      -> s.src["par"]
-The FID is scaled by dividing by the noise level.
-"""
-mutable struct WrappedSpectrum{A<:ℂᴺ} <: AbstractSpectrum
-    name :: S where S <: AbstractString
-    ft :: A # time domain data
-    fs :: A # freq domain data
-    src :: BrukerSpectrum
-    #fplan :: P where P <: AbstractFFTs.Plan
-    #iplan :: P where P <: AbstractFFTs.Plan
-    params :: D where D <: Dict{String, Any}
-    expno :: Int64
-    # Inner constructor method which re-gets dimstate
-    function WrappedSpectrum(n::String,ft::A,fs::A,src::B,e::Int64) where {
-    A<:ℂᴺ, B <: BrukerSpectrum
-    }
-        # get the structure of the FID - 2D, or pseudo-2D
-        new{A}(n, ft, fs, src, Dict{String,Any}(), e)
-    end
-end
-
-""" WrappedSpectrum(s::BrukerSpectrum)
--------------------------------------------------------------------------------------------
-Outer constructor to wrap a Bruker expno, transforming the FID and storing FFT coeffs.
-By default, stores on the GPU if available.
-Scales the data by the noise level, assuming the last 12.5% of the FID is purely noise.
-"""
-function WrappedSpectrum(src::BrukerSpectrum)
-    fs, ft = fft(src; give_processed_fid = true)
-    return WrappedSpectrum(src.name, ft, fs, src, src.expno)
-end
-
-# Convenience methods to access the spectrum
-Base.real(w::WrappedSpectrum) = real(w.fs)
-Base.imag(w::WrappedSpectrum) = imag(w.fs)
-Base.abs(w::WrappedSpectrum) = abs(w.fs)
-Base.view(w::WrappedSpectrum, v) = @view w.fs[v]
-Base.size(w::WrappedSpectrum) = size(w.fs)
-
-# Indexing methods
-Base.getindex(w::WrappedSpectrum, i::Int) = w.fs[i]
-Base.getindex(w::WrappedSpectrum, ::Colon) = w.fs[:]
-Base.getindex(w::WrappedSpectrum, a::AbstractArray) = w.fs[a]
-Base.getindex(w::WrappedSpectrum, rng::Tuple{Float64,Float64}) = w.fs[ppmtoindex(w.src,rng)]
-Base.getindex(w::WrappedSpectrum, δ::Float64) = w.fs[ppmtoindex(w.src, δ)]
-Base.getindex(w::WrappedSpectrum, param::String) = begin 
-    try 
-        w.params[param]
-    catch e;
-        w.src[param];
-    end
-end
-
-export BrukerSpectrum, PoptSpectrum, ProcessedSpectrum, AbstractSpectrum, WrappedSpectrum
+export BrukerSpectrum, PoptSpectrum, ProcessedSpectrum, AbstractSpectrum

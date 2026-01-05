@@ -8,23 +8,19 @@ Must be called _after_ the FID is made complex.
 - n.b. Calling zero_fill(s) on a BrukerSpectrum is a thin wrapper to this function.
 !TODO: change this to have a wrapper to act on the BrukerSpectrum struct but an inner
 function which can be called for correct apodization, zerofilling, and to have for 
-use in an abstract WrappedSpectrum struct.
+use in an abstract FracSpectrum struct.
 
 References
  1. W. M. Wrestler and F. Abildgaard, 1996
  2. M. Nilsson & the UoM GNAT collaboration, 2025
 """
 function fid_DSF_undo(s :: BrukerSpectrum)
-    zf = zf > s["TD"] ? zf : s["TD"] && @warn("Cannot zero fill less than TD. Setting zf = TD.")
-    
     k, ϕ = getoffset(s)
     if iszero(k+ϕ) 
         @warn "Expno $(s.expno) GRPDLY evaluated to zero, assuming no DSP to correct!"
         return s
     end
-    for f in eachfibre(s.fid)
-        circshift!(f, k)
-    end
+    fid = circshift(f, k)
     return fid
 end
 

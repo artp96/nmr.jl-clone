@@ -391,7 +391,7 @@ end
 import DSP: unwrap, unwrap!
 rel(v) = cpu(v)[10:end-10]./maximum(abs.(v)) |> real |> cpu
 # convenience method
-full_angle_correction(w::W; kwargs...) where W<:WrappedSpectrum = full_angle_correction(w.fs, w["SW"], w["SFO1"], w["O1"]; kwargs...)
+full_angle_correction(w::W; kwargs...) where W<:FracSpectrum = full_angle_correction(w.fs, w["SW"], w["SFO1"], w["O1"]; kwargs...)
 
 """A function to calculate PHC0 in ° and PHC1, in ° Hz⁻¹. """
 function full_angle_correction(ψ::A, sw, sf, o1; debug = false) where {C<:Complex,A<:AbstractArray{C}}

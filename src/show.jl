@@ -20,7 +20,7 @@ function show(io::IO, p::ProcessedSpectrum)
     println(io, "Processed size: $(p["SI"]) points")
 end
 
-function show(io::IO, w::WrappedSpectrum)
+function show(io::IO, w::FracSpectrum)
     println(io, "f(s): $(typeof(w.fs)), size: $(size(w.fs)...)")
     println(io, "f(t): $(typeof(w.ft)), size: $(size(w.fs)...)")
     println(io, "\n vvv  W.src  vvv")

@@ -9,7 +9,7 @@ const dpath = joinpath(homedir(), "nmrdata/data/2025/b800mib/20250417")
 const Dpath = joinpath(homedir(), "nmrdata/data/2025/b800mib/20250423-nug/5")
 dosydata = BrukerSpectrum(Dpath)
 data = multiimport(dpath); expnos = [d.expno for d in data]
-ws = WrappedSpectrum.(data)
+ws = FracSpectrum.(data)
 S = (; (Symbol(expnos) .=> data)... )
 G = GMAX["CP-TCI-800S4"].z
 

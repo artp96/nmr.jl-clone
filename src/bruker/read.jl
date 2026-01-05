@@ -74,7 +74,6 @@ function read_params(file)
         parsed = parse_param(m.captures[1], m.captures[2])
         res[string(m.captures[1])] = parsed
     end
-
     # a few little tweaks
     if "O1" in keys(res) && !("O1P" in keys(res))
         res["O1P"] = res["O1"] / res["SFO1"]
@@ -183,7 +182,7 @@ procpars can be accessed using dict indexing, e.g.
     - s["TD"] -> Number of points in the FID, an acqupar.
     - s["LB"] -> Line broadening applied, Hz, a procpar.
 """
-BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int; no_proc_data = false) = begin
+BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_proc :: Int; no_proc_data = true) = begin
     # below, changed joinpath to omit "fid", can't find this anywhere ?
     # fid = float(read_bruker_binary(path))
     acqu_files = filter(!isnothing, match.(r"acq.+s", readdir(path)))
@@ -195,17 +194,21 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
         TD = acqu["TD"]
         fid = zeros(TD) 
         fid = float(read_bruker_binary(joinpath(path, "fid"))) |> gpu!
-        fid = split_fid(fid)
-        fid = sparsevec(fid)
+        fid = split_fid(fid) |> cpu!
+        # fid should be zero_filled immediately to get original dimension.
+        fid = zero_fill(fid, 2)
     elseif "ser" in readdir(path)
-        fid = float(read_bruker_binary(joinpath(path, "ser"))) 
-        fid = split_fid(fid)
-        fid = collect(reshape(fid, get_ser_dims(acqu)))
+        fid = float(read_bruker_binary(joinpath(path, "ser"))) |> gpu!
+        fid = reshape(fid, get_ser_dims(acqu))
+        @show typeof(fid)
+        fid = split_fid(fid) |> cpu!
+        @show typeof(fid)
         fid = zero_fill(fid, fill(2, ndims(fid)))
+        @show typeof(fid)
     else
         @error "No 'fid' or 'ser' found in $path."
     end
-    fid .*= 2.0^acqu["NC"]
+    fid *= 2.0^acqu["NC"]
      
     name = basename(dirname(path))
     expno = basename(path) 
@@ -261,7 +264,7 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}; kwargs...)
 """
     multiimport(fpath::AbstractString) 
 -------------------------------------------------------------------------------------------
-Import an array of Bruker spectra from a folder as WrappedSpectrum.
+Import an array of Bruker spectra from a folder as FracSpectrum.
 - fpath : path/to/folder/of/expnos
 - givemissing : Optionally keep the indices of files which 
 could not be imported as v[idx] = "missing".
@@ -288,17 +291,17 @@ end
 """
     multiwrap(fpath::AbstractString) 
 -------------------------------------------------------------------------------------------
-Import an array of Bruker spectra from a folder as WrappedSpectrum.
+Import an array of Bruker spectra from a folder as FracSpectrum.
 - fpath : path/to/folder/of/expnos
 - givemissing : Optionally keep the indices of files which 
 could not be imported as v[idx] = "missing".
 Calls multiimport under the hood.
 """
 multiwrap(V::W; givemissing = false, index = true) where W <: AbstractVector = begin
-    wrap = Vector{Union{Missing, WrappedSpectrum}}(undef, length(V))
+    wrap = Vector{Union{Missing, FracSpectrum}}(undef, length(V))
     Threads.@threads for i in eachindex(V)
         if !ismissing(V[i])
-            wrap[i] = WrappedSpectrum(V[i]) 
+            wrap[i] = FracSpectrum(V[i]) 
         else
             @info("Expno $i was not imported.")
             wrap[i] = missing
@@ -306,7 +309,7 @@ multiwrap(V::W; givemissing = false, index = true) where W <: AbstractVector = b
     end
     if !givemissing 
         filter!(!ismissing, wrap) 
-        data = convert(Vector{WrappedSpectrum}, wrap)
+        data = convert(Vector{FracSpectrum}, wrap)
     end
     return wrap = index ? Dict([w.expno => w for w in wrap]) : wrap
 end

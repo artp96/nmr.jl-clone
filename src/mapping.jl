@@ -7,13 +7,13 @@
 # 3 - B1-NUG mapping
     
 map_gradient_nonuniformity(s::BrukerSpectrum; kwargs...) = begin
-    w = WrappedSpectrum(s)
+    w = FracSpectrum(s)
     return map_gradient_nonuniformity(w; kwargs...)
 end
 
 
 
-function map_gradient_nonuniformity(w::WrappedSpectrum)
+function map_gradient_nonuniformity(w::FracSpectrum)
     # unpack (shallowly) the variables we need
     arr = w.s;
     gpz = w

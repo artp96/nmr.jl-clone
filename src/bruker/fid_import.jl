@@ -12,22 +12,38 @@ References
  1. W. M. Wrestler and F. Abildgaard, 1996
  2. M. Nilsson & the UoM GNAT collaboration, 2025
 """
-function fid_DSF_undo(s :: BrukerSpectrum, f = identity)
+function fid_DSF_undo(s :: BrukerSpectrum)
+    @assert s.α == 0 "Spectrum does not appear to be time-domain, α = $(s.α)!"
     k = floor(Int, get_DSF_offset(s))
     if iszero(k+ϕ) 
         @warn "Expno $(s.expno) GRPDLY evaluated to zero, 
         \nassuming no DSP to correct!"
         return s
     end
-    #fids = s.fid
     v = s.fid
     #for fid in eachfibre(fids)
     dsp = deepcopy(v[1:k])
         v = v[k+1:end]
-        v = f(v)
         append!(dsp, v)
     #end
     return v
+end
+
+"""
+    Function to reapply the effect of Bruker's DSP filter to a FID.
+    necessary for applying some time-domain filters.
+"""
+function fid_DSF_redo(s :: BrukerSpectrum)
+    @assert s.α == 0 "Spectrum does not appear to be time-domain, α = $(s.α)!"
+    k = floor(Int, get_DSF_offset(s))
+    if iszero(k+ϕ) 
+        @warn "Expno $(s.expno) GRPDLY evaluated to zero, 
+        \nassuming no DSP to correct!"
+        return s
+    end
+    dims = ndims(s.fid)
+    v = copy(fid)
+    circshift!(s.fid, v, (k,1))
 end
 
 """ getoffset(s <: BrukerSpectrum) -> x ∈ u64, y ∈ f64
@@ -35,7 +51,7 @@ end
 Get the GRPDLY offset or look it up, and return the offset and first-order ϕ₁(ω)
 factor in (° Hz⁻¹).
 """
-function get_DSF_offset(s :: BrukerSpectrum)
+function get_DSF_offset(s :: BrukerSpectrum)::n64
     # simplest case - return GRPDLY iff ∃d > 0.
     if haskey(s, "GRPDLY")
         offset = 0 < s["GRPDLY"] ? s["GRPDLY"] : Throw(ErrorException(
@@ -87,7 +103,23 @@ const DSP_TABLE=[
       1536      61.657       71.917           0.;
       2048      70.492       72.031           0.]
 
-export fid_DSF_undo, get_DSF_offset
+"""
+split_fid(fid :: V{ℝ}) where {V <: AbstractVector, ℝ<:Real} 
+Split a fresh FID into it's real and complex parts.
+N-D spectra are still acquired time-domain sequentially, so this should work for all N-D spectra.
+This function effectively chops the FID length in half, zero filling must be applied 
+immediately to get back the original dims.
+"""
+function split_fid(fid :: V) where V <: ℝᴺ
+    fid = complex(fid)
+    viewidxs = fill(Colon(), ndims(fid)-1)
+    v_re = @view fid[1:2:end, viewidxs...]
+    v_im = @view fid[2:2:end, viewidxs...]
+    v_re .-= 1im * v_im
+    return v_re
+end
+
+export fid_DSF_undo, get_DSF_offset, split_fid
 
 
 #=
