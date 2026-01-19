@@ -124,4 +124,4 @@ export BrukerSpectrum, ProcessedSpectrum, dump, # constructors, I/O
        intrng, intrng_data, intrng_indices, intrng_shifts, # integration regions
        debug # debug variable
 
-data = BrukerSpectrum("test/data/1D_test/1")
+#data = BrukerSpectrum("test/data/1D_test/1")
