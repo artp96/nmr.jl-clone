@@ -108,7 +108,7 @@ function _gpu!_FID_scatter_kernel!(out, in, facs, strides)
     return nothing
 end
 """
-    Move an FID to the GPU. Zeros must be stored explicitly.
+    Move an FID to the GPU, storing only the nonzero values.
 """
 gpu!(f::FID{N, A}) where {N, A<:Array} = FID(gpu!(f.data), f.facs)
 """
@@ -176,7 +176,7 @@ zero_fill(a::A, t) where A<:AbstractArray = FID(a, t)
 """
     Filling an n-D array with one factor fills the entire array.
 """
-zero_fill(data::A, facs::Int) where {N,A<:AbstractArray{c64,N}} = FID(data, ntuple(_ -> facs, N))
+zero_fill(data::A, facs::Int) where {N,A<:AbstractArray{c64}} = FID(data, ntuple(_ -> facs, ndims(A)))
 # zero_fill should overwrite the previous filling factors.
 zero_fill(f::FID{N, A}, facs::T) where {N,A<:Array{c64, N}, T<:NTuple{N}} = FID(f.data, facs)
 # Reindexing is done most efficiently on the CPU.
@@ -188,16 +188,21 @@ zero_fill(f::FID{N, X}, facs::T) where {N,X<:CuArray{c64, N}, T<:NTuple{N}} = be
 end
 
 
+# """
+#     Convenience constructor: scalar factor applies to all dimensions
+# """
+# FID(data::A, fac::Int) where {A<:AbstractArray{c64}} =
+#     FID(data, ntuple(_ -> fac, ndims(data)))
 
 x_1 = rand(c64, 10)
-x_2 = FID(x_1, 2)
+x_2 = zero_fill(x_1, 2)
 
 X_1 = rand(c64, 10, 10)
-X_2 = FID(X_1, 2)
+X_2 = zero_fill(X_1, 2)
 
 
 g_1 = CUDA.rand(c64, 10)
-g_2 = FID(g_1, 2)
+g_2 = zero_fill(g_1, 2)
 
 G_1 = CUDA.rand(c64, 10, 10)
-G_2 = FID(G_1, 2)
+G_2 = zero_fill(G_1, 2)

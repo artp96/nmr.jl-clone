@@ -3,7 +3,7 @@
 dense!(x::S) where S<:𝕊ᴺ = return x = Array(x)
 if has_cuda_gpu() & has_cuda()
     @info "CUDA found. GPU mode, use gpu!(data) and cpu!(data) to move data."
-    const CSA = CUDA.CUSPARSE.AbstractCuSparseArray
+    const CSA = CUDA.GPUArrays.AbstractGPUSparseArray
     """
         Move an array to the gpu!. Alias for CuArray, preserves sparsity of sparse complex arrays.
     """
