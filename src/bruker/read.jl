@@ -203,7 +203,7 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
         @show typeof(fid)
         fid = split_fid(fid) |> cpu!
         @show typeof(fid)
-        fid = zero_fill(fid, fill(2, ndims(fid)))
+        fid = zero_fill(fid, 2)
         @show typeof(fid)
     else
         @error "No 'fid' or 'ser' found in $path."
@@ -225,7 +225,7 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
 
     # Needs to be instantiated correctly
     procs = Dict{Int, ProcessedSpectrum{Float64, Vector{Float64}}}()
-
+    
     for procno in procnos
         proc_path = joinpath(path, "pdata", string(procno))
         procs[procno] = ProcessedSpectrum(proc_path, procno; no_proc_data = no_proc_data)
