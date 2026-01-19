@@ -6,12 +6,6 @@ const Intrng{T} = Tuple{T, T} where T <: AbstractFloat
 
 
 
-"""
-    Abstract Supertype of spectrum structs.
-"""
-abstract type AbstractSpectrum end
-
-
 """ ProcessedSpectrum <: AbstractSpectrum
     - **re_ft**: real part of Fourier transform
     - **im_ft**: imaginary part of Fourier transform

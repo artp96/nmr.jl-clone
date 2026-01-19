@@ -176,11 +176,11 @@ zero_fill(a::A, t) where A<:AbstractArray = FID(a, t)
 """
     Filling an n-D array with one factor fills the entire array.
 """
-zero_fill(data::A, facs::Int) where {N,A<:AbstractArray{c64}} = FID(data, ntuple(_ -> facs, ndims(A)))
+zero_fill(data::A, facs::N) where {N<:Integer, A<:AbstractArray{c64}} = FID(data, ntuple(_ -> facs, ndims(A)))
 # zero_fill should overwrite the previous filling factors.
-zero_fill(f::FID{N, A}, facs::T) where {N,A<:Array{c64, N}, T<:NTuple{N}} = FID(f.data, facs)
+zero_fill(f::FID{N, A}, facs::T) where {N, A<:Array{c64, N}, T<:NTuple{N}} = FID(f.data, facs)
 # Reindexing is done most efficiently on the CPU.
-zero_fill(f::FID{N, X}, facs::T) where {N,X<:CuArray{c64, N}, T<:NTuple{N}} = begin
+zero_fill(f::FID{N, X}, facs::T) where {N, X<:CuArray{c64, N}, T<:NTuple{N}} = begin
     idxs = CartesianIndices(f)
     data = @view f.data[idxs]
     data = collect(data)

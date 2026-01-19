@@ -5,18 +5,18 @@
     - a <: Tuple{f64, N}: transform angle, in π / 2 radians, of each dimension.
     - src :: B <: AbstractSpectrum
     - params :: D where D <: Dict{String, Any}
--------------------------------------------------------------------------------------------
-Called to wrap an imported spectrum. Tracks the time-frequency state of the spectrum in a. 
-Each dimension can be transformed independently.
-The stored time-domain data is always at least preprocessed, ready for processing and 
-transformation. For example, 
-    - It has the correct dimensions.
-    - A Bruker FID has been made complex, and had it's GRPDLY offset corrected.
-    - A Bruker Procno spectrum has been combined and made complex, unless it is real only.
-Note that α is given in units of radians. According to convention, this variable could be 
-called "a" and be given in units of π/2 rad. such that "a = 1" corresponds to the Fourier
-domain and a = 0 to the time domain.
-See also the convenience functions α(a) and get_u(a).
+    -------------------------------------------------------------------------------------------
+    Called to wrap an imported spectrum. Tracks the time-frequency state of the spectrum in a. 
+    Each dimension can be transformed independently.
+    The stored time-domain data is always at least preprocessed, ready for processing and 
+    transformation. For example, 
+        - It has the correct dimensions.
+        - A Bruker FID has been made complex, and had it's GRPDLY offset corrected.
+        - A Bruker Procno spectrum has been combined and made complex, unless it is real only.
+    Note that α is given in units of radians. According to convention, this variable could be 
+    called "a" and be given in units of π/2 rad. such that "a = 1" corresponds to the Fourier
+    domain and a = 0 to the time domain.
+    See also the convenience functions α(a) and get_u(a).
 """
 mutable struct FracSpectrum{N, B} <: AbstractSpectrum where {N, B<:AbstractSpectrum}
     name :: S where S <: AbstractString
