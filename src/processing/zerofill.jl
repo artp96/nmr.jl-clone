@@ -121,9 +121,9 @@ cpu!(f::FID{N, X}) where {N, X<:CuArray} = begin
     return FID(data, f.facs)
 end
 Base.IndexStyle(::Type{<:FID}) = IndexCartesian()
-Base.size(f::FID{N,A}) where N where A<:Array = size(f.data) .* f.facs
+Base.size(f::FID{N,A}) where N where A = size(f.data) .* f.facs
 Base.size(f::FID{N,X}) where N where X<:CuArray = size(f.data)
-Base.axes(f::FID{N,A}) where N where A<:Array = axes(f.data)
+Base.axes(f::FID{N,A}) where N where A = axes(f.data) .* f.facs .- f.facs .+ 1
 Base.axes(f::FID{N,X}) where N where X<:CuArray = axes(f.data)
 Base.show(io::IO, fid::FID) = begin
     show(io, "FID with zero-filling factor $(fid.facs) in each dimension. Data:\n")
