@@ -205,7 +205,7 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
     else
         @error "No 'fid' or 'ser' found in $path."
     end
-    fid *= 2.0^acqu["NC"]
+    fid .*= 2.0^acqu["NC"]
      
     name = basename(dirname(path))
     expno = basename(path) 
