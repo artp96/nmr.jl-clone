@@ -171,7 +171,7 @@ merge_acqus(acquN::Vector{D}) where D<:Dict = merge_acqus!(similar(acquN[1]), ac
     Compute the dimension of the data for reshape(). The TD2 dimension is implicitly zero filled 
     once due to serial acquisition of re,im,re data in Bruker format.
 """
-get_ser_dims(D::Dict)::Tuple = (D["TD2"], filter(!iszero, D["TD_INDIRECT"])...)
+get_ser_dims(D::Dict)::Tuple = @show (D["TD2"], filter(!iszero, D["TD_INDIRECT"])...)
 
 """
    BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
