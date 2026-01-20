@@ -199,12 +199,9 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
         fid = zero_fill(fid, 2)
     elseif "ser" in readdir(path)
         fid = float(read_bruker_binary(joinpath(path, "ser"))) |> gpu!
-        fid = reshape(fid, get_ser_dims(acqu))
-        @show typeof(fid)
         fid = split_fid(fid) |> cpu!
-        @show typeof(fid)
+        fid = reshape(fid, get_ser_dims(acqu))
         fid = zero_fill(fid, 2)
-        @show typeof(fid)
     else
         @error "No 'fid' or 'ser' found in $path."
     end

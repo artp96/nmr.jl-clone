@@ -76,7 +76,7 @@ function get_DSF_offset(s :: BrukerSpectrum)::n64
         end
     end
 
-    return -1offset
+    return -offset
 end
 
 const DSP_TABLE=[
