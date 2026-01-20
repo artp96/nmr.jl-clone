@@ -110,11 +110,10 @@ N-D spectra are still acquired time-domain sequentially, so this should work for
 This function effectively chops the FID length in half, zero filling must be applied 
 immediately to get back the original dims.
 """
-function split_fid(fid :: V) where V <: ℝᴺ
+function split_fid(fid :: V) where V <: ℝ¹
     fid = complex(fid)
-    viewidxs = fill(Colon(), ndims(fid)-1)
-    v_re = @view fid[1:2:end, viewidxs...]
-    v_im = @view fid[2:2:end, viewidxs...]
+    v_re = @view fid[1:2:end]
+    v_im = @view fid[2:2:end]
     v_re .-= 1im * v_im
     return v_re
 end

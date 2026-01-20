@@ -271,29 +271,6 @@ end
 
 
 import Base.im
-""" 
-    synthesize_ser(s :: S) where S <: ProcessedSpectrum
-
-Function to produce a synthetic serfile from POPT-processed data - dubious! 
-No trivial way to find units!
-May not act correctly if the procno is not a popt procno!
-"""
-synthesize_ser(s :: S) where S <: ProcessedSpectrum = s.re_ft + base.im * s.im_ft
-
-
-# function split_fid(fid :: CV) where CV <: CuVector
-#     fid = complex(fid)
-#     fid .-= 1im * circshift(fid, -1)
-#     fid .-= circshift(fid, -1)
-#     return fid
-# end
-# function split_fid_kernel(fid)
-
-    
-#     return nothing # void
-# end
-#
-
 """
     ParamDict(s <: AbstractSpectrum) -> s
 - acqupars :: Dict
