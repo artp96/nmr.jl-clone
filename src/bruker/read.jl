@@ -171,7 +171,7 @@ merge_acqus(acquN::Vector{D}) where D<:Dict = merge_acqus!(similar(acquN[1]), ac
     Compute the dimension of the data for reshape(). The TD2 dimension is implicitly zero filled 
     once due to serial acquisition of re,im,re data in Bruker format.
 """
-get_ser_dims(D::Dict)::Tuple = (2D["TD2"], filter(!iszero, D["TD_INDIRECT"])...)
+get_ser_dims(D::Dict)::Tuple = (D["TD2"], filter(!iszero, D["TD_INDIRECT"])...)
 
 """
    BrukerSpectrum("/data/path") -> s :: {BrukerSpectrum <: AbstractSpectrum}
@@ -193,13 +193,13 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
     if "fid" in readdir(path)
         TD = acqu["TD"]
         fid = zeros(TD) 
-        fid = float(read_bruker_binary(joinpath(path, "fid"))) |> gpu!
-        fid = split_fid(fid) |> cpu!
+        fid = float(read_bruker_binary(joinpath(path, "fid"))) 
+        fid = split_fid(fid) 
         # fid should be zero_filled immediately to get original dimension.
         fid = zero_fill(fid, 2)
     elseif "ser" in readdir(path)
-        fid = float(read_bruker_binary(joinpath(path, "ser"))) |> gpu!
-        fid = split_fid(fid) |> cpu!
+        fid = float(read_bruker_binary(joinpath(path, "ser"))) 
+        fid = split_fid(fid) 
         fid = reshape(fid, get_ser_dims(acqu))
         fid = zero_fill(fid, 2)
     else
