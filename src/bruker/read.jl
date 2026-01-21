@@ -198,10 +198,19 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
         # fid should be zero_filled immediately to get original dimension.
         fid = zero_fill(fid, 2)
     elseif "ser" in readdir(path)
+        dims = get_ser_dims(acqu)
+        # set the chunk size. ser data is always in blocks of 1024 bytes.
+        # If 32 bit data, this is 256-point blocks, or half otherwise.
+        chunk = acqu["DTYPA"] == 0 ? 256 : 128
+        offs = rem(2dims[1], chunk)
+        if offs > 0 
+            offs = chunk - offs
+            dims[1] .+= offs ÷ 2 
+        end
         fid = float(read_bruker_binary(joinpath(path, "ser"))) 
         fid = split_fid(fid) 
-        fid = reshape(fid, get_ser_dims(acqu))
-        fid = zero_fill(fid, 2)
+        fid = reshape(fid, dims)
+        # fid = zero_fill(fid, 2)
     else
         @error "No 'fid' or 'ser' found in $path."
     end
