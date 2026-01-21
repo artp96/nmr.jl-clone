@@ -115,7 +115,7 @@ function split_fid(fid :: V) where V <: ℝ¹
     v_re = @view fid[1:2:end]
     v_im = @view fid[2:2:end]
     v_re .-= 1im * v_im
-    return v_re
+    return fid[1:2:end]
 end
 
 export fid_DSF_undo, get_DSF_offset, split_fid

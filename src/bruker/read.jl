@@ -209,7 +209,7 @@ BrukerSpectrum(path :: AbstractString, procnos :: AbstractArray{Int}, default_pr
         end
         fid = float(read_bruker_binary(joinpath(path, "ser"))) 
         fid = split_fid(fid) 
-        fid = reshape(fid, dims)
+        fid = reshape(fid, dims[1]÷2, dims[2:end]...)
         # fid = zero_fill(fid, 2)
     else
         @error "No 'fid' or 'ser' found in $path."
